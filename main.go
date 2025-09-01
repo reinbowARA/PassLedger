@@ -34,6 +34,18 @@ const AllEntryGroupName = "Все"
 
 func main() {
 	myApp := app.New()
+
+	var icon fyne.Resource
+	var err error
+	theme := myApp.Settings().ThemeVariant()
+	if theme == 0 {
+		icon, err = fyne.LoadResourceFromPath("src/icon-white.svg")
+	} else {
+		icon, err = fyne.LoadResourceFromPath("src/icon.svg")
+	}
+	if err == nil {
+		myApp.SetIcon(icon)
+	}
 	loginWindow := myApp.NewWindow("Password Book - Вход")
 	loginWindow.Resize(fyne.NewSize(350, 250))
 	loginWindow.CenterOnScreen()
@@ -371,7 +383,6 @@ func filterEntries(entries []PasswordEntry, settings FilterSettings) []PasswordE
 
 	return out
 }
-
 
 func loadMockData() []PasswordEntry {
 	jsonData := `[
