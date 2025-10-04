@@ -1,4 +1,4 @@
-APP_NAME = passwordbook
+APP_NAME = passledger
 BUILD_DIR = build
 
 all: build
