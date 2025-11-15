@@ -43,7 +43,7 @@ func KDF_GOSTR3411_2012_256(seed, label, context []byte, keySize int) ([]byte, e
 // DeriveKeyFromPassword: комбинируем HMAC(Streebog) + PBKDF2(Streebog) + KDF
 // Возвращает 32-байтовый ключ (для Кузнечика используем 32 байта)
 func DeriveKeyFromPassword(password []byte, salt []byte, iterations int) ([]byte, error) {
-	// 1) первичный HMAC от пароля (как в твоём test.go)
+	// 1) первичный HMAC от пароля
 	hmacKey := HMACStreebog256(password, password)
 
 	// 2) PBKDF2 с функцией Streebog
@@ -51,7 +51,7 @@ func DeriveKeyFromPassword(password []byte, salt []byte, iterations int) ([]byte
 		return gost_streebog.New()
 	})
 
-	// 3) Дополнительный KDF (мы используем метку "шифр" как в твоём примере)
+	// 3) Дополнительный KDF
 	label := []byte("шифр")
 	context := []byte("")
 	finalKey, err := KDF_GOSTR3411_2012_256(pbkdf2Key, label, context, 32)

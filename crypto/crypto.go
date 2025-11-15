@@ -46,7 +46,6 @@ func EncryptData(key, plaintext []byte) ([]byte, error) {
 	// создаём блок Кузнечик
 	block := gost_kuznechik.NewCipher(key)
 
-
 	blockSize := block.BlockSize() // должен быть 16
 	iv := make([]byte, blockSize)
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
