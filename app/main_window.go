@@ -199,6 +199,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	// === Панель деталей ====
 	showPassBtn := widget.NewButtonWithIcon("Показать пароль", theme.VisibilityIcon(), nil)
 	copyBtn := widget.NewButtonWithIcon("Скопировать", theme.ContentCopyIcon(), nil)
+	passwordVisible := false
+	selectedEntry := models.PasswordEntry{}
 
 	list.OnSelected = func(id widget.ListItemID) {
 		if id < 0 || id >= len(entries) {
@@ -210,29 +212,31 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		if id < 0 || id >= len(entries) {
 			return
 		}
-		e := entries[id]
-		var text string = fmt.Sprintf(`
-	Название: %s 
-	Логин: %s 
-	Пароль: %s 
-	URL: %s 
-	Заметки: %s `,
-			e.Title, e.Username, maskPassword(e.Password), e.URL, e.Notes)
-		detail.ParseMarkdown(text) //TODO переделать показ пароля
+		selectedEntry = entries[id]
+		passwordVisible = false
+		var text string = ShowEntry(selectedEntry, true)
+		detail.ParseMarkdown(text)
+		showPassBtn.SetText("Показать пароль")
+		showPassBtn.Show() // ensure button is visible
 
 		showPassBtn.OnTapped = func() {
-			var text string = fmt.Sprintf(`
-	Название: %s 
-	Логин: %s 
-	Пароль: %s 
-	URL: %s 
-	Заметки: %s `,
-				e.Title, e.Username, e.Password, e.URL, e.Notes)
-			detail.ParseMarkdown(text)
+			if passwordVisible {
+				// Скрыть пароль
+				var text string = ShowEntry(selectedEntry, true)
+				detail.ParseMarkdown(text)
+				showPassBtn.SetText("Показать пароль")
+				passwordVisible = false
+			} else {
+				// Показать пароль
+				var text string = ShowEntry(selectedEntry, false)
+				detail.ParseMarkdown(text)
+				showPassBtn.SetText("Скрыть пароль")
+				passwordVisible = true
+			}
 		}
 
 		copyBtn.OnTapped = func() {
-			win.Clipboard().SetContent(e.Password)
+			win.Clipboard().SetContent(selectedEntry.Password)
 		}
 	}
 
@@ -255,4 +259,18 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	content := container.NewBorder(toolbar, nil, nil, nil, mainContent)
 	win.SetContent(content)
 	win.Show()
+}
+
+func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
+	if hidePasswd{
+		entry.Password = maskPassword(entry.Password)
+	}
+	text = fmt.Sprintf(`
+	Название: %s
+	Логин: %s
+	Пароль: %s
+	URL: %s
+	Заметки: %s `,
+		entry.Title, entry.Username, entry.Password, entry.URL, entry.Notes)
+	return
 }
