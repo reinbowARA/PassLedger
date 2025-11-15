@@ -164,8 +164,8 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 	)
 }
 
-// showAddGroup теперь принимает pointer на slice groups и саму группу list
-func showAddGroup(win fyne.Window, groupsSlice *[]string, groupList *widget.List) {
+// showAddGroup теперь принимает pointer на slice groups и саму группу list, а также database
+func showAddGroup(win fyne.Window, database *sql.DB, key []byte, groupsSlice *[]string, groupList *widget.List) {
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("Название новой группы")
 
@@ -186,7 +186,14 @@ func showAddGroup(win fyne.Window, groupsSlice *[]string, groupList *widget.List
 						return
 					}
 				}
-				*groupsSlice = append(*groupsSlice, name)
+				// добавляем в db
+				err := db.AddGroup(database, name)
+				if err != nil {
+					dialog.ShowError(err, win)
+					return
+				}
+				// обновляем список групп из db
+				*groupsSlice = getUniqueGroupsFromDB(database, key)
 				groupList.Refresh()
 			}
 		},

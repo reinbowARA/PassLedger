@@ -34,6 +34,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	addBtn := widget.NewButtonWithIcon("Добавить", theme.ContentAddIcon(), func() {
 		showAddForm(win, database, key, func() {
 			refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
+			groupsSlice = getUniqueGroupsFromDB(database, key)
+			groupList.Refresh()
 		})
 	})
 
@@ -92,8 +94,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				delBtn.Hide()
 				rowBtn.Importance = widget.HighImportance
 				rowBtn.OnTapped = func() {
-					// добавляем новую группу в память (и перерисуем)
-					showAddGroup(win, &groupsSlice, groupList) // ниже - новая сигнатура
+					// добавляем новую группу в db (и обновляем список)
+					showAddGroup(win, database, key, &groupsSlice, groupList)
 				}
 				return
 			}
@@ -111,9 +113,31 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				delBtn.OnTapped = func() {
 					dialog.ShowConfirm("Удаление группы", "Удалить группу '"+name+"' и все её записи?", func(ok bool) {
 						if ok {
-							_ = db.DeleteGroup(database, name)
+							// получаем id группы по имени
+							var id int
+							err := database.QueryRow(`SELECT id FROM groups WHERE name = ?`, name).Scan(&id)
+							if err != nil {
+								if err == sql.ErrNoRows {
+									dialog.ShowError(fmt.Errorf("Группа '%s' не найдена", name), win)
+								} else {
+									dialog.ShowError(err, win)
+								}
+								return
+							}
+							// удаляем все записи в группе
+							_, err = database.Exec(`DELETE FROM entries WHERE group_id = ?`, id)
+							if err != nil {
+								dialog.ShowError(err, win)
+								return
+							}
+							// удаляем группу
+							err = db.DeleteGroup(database, id)
+							if err != nil {
+								dialog.ShowError(err, win)
+								return
+							}
 							// пересобираем groupsSlice и список
-							groupsSlice = getUniqueGroupsFromDB(database, key) // либо из entries
+							groupsSlice = getUniqueGroupsFromDB(database, key)
 							groupList.Refresh()
 							// обновляем записи, показывая "Все"
 							refreshListFiltered(database, key, &entries, win, "Все", "")
@@ -195,20 +219,22 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		}
 		e := entries[id]
 		var text string = fmt.Sprintf(`
-							Название: %s 
-							Логин: %s 
-							Пароль: %s 
-							URL: %s 
-							Заметки: %s `, e.Title, e.Username, maskPassword(e.Password), e.URL, e.Notes)
+	Название: %s 
+	Логин: %s 
+	Пароль: %s 
+	URL: %s 
+	Заметки: %s `, 
+		e.Title, e.Username, maskPassword(e.Password), e.URL, e.Notes)
 		detail.ParseMarkdown(text) //TODO переделать показ пароля
 
 		showPassBtn.OnTapped = func() {
 			var text string = fmt.Sprintf(`
-							Название: %s 
-							Логин: %s 
-							Пароль: %s 
-							URL: %s 
-							Заметки: %s `, e.Title, e.Username, e.Password, e.URL, e.Notes)
+	Название: %s 
+	Логин: %s 
+	Пароль: %s 
+	URL: %s 
+	Заметки: %s `, 
+		e.Title, e.Username, e.Password, e.URL, e.Notes)
 			detail.ParseMarkdown(text)
 		}
 

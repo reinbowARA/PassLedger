@@ -42,10 +42,14 @@ func getUniqueGroups(entries []models.PasswordEntry) []string {
 
 // getUniqueGroupsFromDB грузит свежие группы из DB
 func getUniqueGroupsFromDB(database *sql.DB, key []byte) []string {
-	all, err := db.LoadAllEntries(database, key)
+	groups, err := db.GetGroup(database)
 	if err != nil {
 		// если ошибка — возвращаем пустой набор кроме "Все"
 		return []string{"Все"}
 	}
-	return getUniqueGroups(all)
+	out := []string{"Все"}
+	for _, g := range groups {
+		out = append(out, g.Name)
+	}
+	return out
 }

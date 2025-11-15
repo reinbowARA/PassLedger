@@ -2,47 +2,57 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/reinbowARA/PassLedger/crypto"
 	"github.com/reinbowARA/PassLedger/models"
 )
 
+func getOrCreateGroup(dbConn *sql.DB, name string) (sql.NullInt64, error) {
+	if name == "" {
+		return sql.NullInt64{Valid: false}, nil
+	}
+	var id sql.NullInt64
+	err := dbConn.QueryRow(`SELECT id FROM groups WHERE name = ?`, name).Scan(&id)
+	if err == sql.ErrNoRows {
+		result, err := dbConn.Exec(`INSERT INTO groups (name) VALUES (?)`, name)
+		if err != nil {
+			return sql.NullInt64{}, err
+		}
+		insertID, _ := result.LastInsertId()
+		id = sql.NullInt64{Int64: insertID, Valid: true}
+	} else if err != nil {
+		return sql.NullInt64{}, err
+	}
+	return id, nil
+}
+
 // SaveEntry сохраняет новую запись (шифрует поля)
 func SaveEntry(dbConn *sql.DB, key []byte, e models.PasswordEntry) error {
-	encTitle, err := crypto.EncryptData(key, []byte(e.Title))
+	groupId, err := getOrCreateGroup(dbConn, e.Group)
 	if err != nil {
 		return err
 	}
-	encUser, err := crypto.EncryptData(key, []byte(e.Username))
-	if err != nil {
-		return err
-	}
-	encPass, err := crypto.EncryptData(key, []byte(e.Password))
-	if err != nil {
-		return err
-	}
-	var encURL, encNotes []byte
+	encTitle, _ := crypto.EncryptData(key, []byte(e.Title))
+	encUser, _ := crypto.EncryptData(key, []byte(e.Username))
+	encPass, _ := crypto.EncryptData(key, []byte(e.Password))
+	var encURL []byte
 	if e.URL != "" {
-		encURL, err = crypto.EncryptData(key, []byte(e.URL))
-		if err != nil {
-			return err
-		}
+		encURL, _ = crypto.EncryptData(key, []byte(e.URL))
 	}
+	var encNotes []byte
 	if e.Notes != "" {
-		encNotes, err = crypto.EncryptData(key, []byte(e.Notes))
-		if err != nil {
-			return err
-		}
+		encNotes, _ = crypto.EncryptData(key, []byte(e.Notes))
 	}
 
-	_, err = dbConn.Exec(`INSERT INTO entries (title, username, password, url, notes, "group")
-		VALUES (?, ?, ?, ?, ?, ?)`, encTitle, encUser, encPass, encURL, encNotes, e.Group)
+	_, err = dbConn.Exec(`INSERT INTO entries (title, username, password, url, notes, group_id)
+		VALUES (?, ?, ?, ?, ?, ?)`, encTitle, encUser, encPass, encURL, encNotes, groupId)
 	return err
 }
 
 // LoadAllEntries загружает все записи и дешифрует их
 func LoadAllEntries(dbConn *sql.DB, key []byte) ([]models.PasswordEntry, error) {
-	rows, err := dbConn.Query(`SELECT id, title, username, password, url, notes, "group" FROM entries ORDER BY id`)
+	rows, err := dbConn.Query(`SELECT e.id, e.title, e.username, e.password, e.url, e.notes, g.name as group_name FROM entries e LEFT JOIN groups g ON e.group_id = g.id ORDER BY e.id`)
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +151,41 @@ func UpdateEntry(dbConn *sql.DB, key []byte, e models.PasswordEntry) error {
 		return err
 	}
 
-	_, err = dbConn.Exec(`UPDATE entries SET title=?, username=?, password=?, url=?, notes=?, "group"=? WHERE id=?`,
+	_, err = dbConn.Exec(`UPDATE entries SET title=?, username=?, password=?, url=?, notes=?, group_id=(select id from groups where name = ?) WHERE id=?`,
 		encTitle, encUser, encPass, encURL, encNotes, e.Group, e.ID)
 	return err
 }
 
 // DeleteGroup удаляет все записи в группе (если нужно)
-func DeleteGroup(dbConn *sql.DB, group string) error {
-	_, err := dbConn.Exec(`DELETE FROM entries WHERE "group" = ?`, group)
+func DeleteGroup(dbConn *sql.DB, id int) error {
+	_, err := dbConn.Exec(`DELETE FROM groups WHERE id = ?`, id)
 	return err
+}
+
+func AddGroup(dbConn *sql.DB, name string) error {
+	_, err := dbConn.Exec(`INSERT INTO groups (name) VALUES (?)`, name)
+	return err
+}
+
+func GetGroup(dbConn *sql.DB) (listGroup []models.Groups, err error) {
+	rows, err := dbConn.Query(`SELECT * FROM groups`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var group models.Groups
+		err = rows.Scan(&group.Id, &group.Name)
+		if err != nil {
+			err = fmt.Errorf("ошибка сканирования строки: %w", err)
+			return
+		}
+		listGroup = append(listGroup, group)
+	}
+
+	if err = rows.Err(); err != nil {
+		err = fmt.Errorf("ошибка при обходе строк: %w", err)
+		return
+	}
+	return
 }

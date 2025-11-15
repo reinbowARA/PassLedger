@@ -25,23 +25,11 @@ func CreateNewDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error) {
 		return nil, nil, err
 	}
 
-	schema := `
-	CREATE TABLE IF NOT EXISTS meta (
-		id INTEGER PRIMARY KEY CHECK (id = 1),
-		salt BLOB NOT NULL,
-		iterations INTEGER NOT NULL,
-		verifier BLOB NOT NULL
-	);
-	CREATE TABLE IF NOT EXISTS entries (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		title BLOB NOT NULL,
-		username BLOB NOT NULL,
-		password BLOB NOT NULL,
-		url BLOB,
-		notes BLOB,
-		"group" TEXT
-	);`
-	if _, err := db.Exec(schema); err != nil {
+	schema, err := os.ReadFile("db/table.sql")
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := db.Exec(string(schema)); err != nil {
 		return nil, nil, err
 	}
 

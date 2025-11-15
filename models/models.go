@@ -14,3 +14,8 @@ type FilterSettings struct {
 	Field string
 	Query string
 }
+
+type Groups struct {
+	Id   int    `db:"id"`
+	Name string `db:"name"`
+}
