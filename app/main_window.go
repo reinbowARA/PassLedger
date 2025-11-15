@@ -112,16 +112,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 					dialog.ShowConfirm("Удаление группы", "Удалить группу '"+name+"' и все её записи?", func(ok bool) {
 						if ok {
 							var id int
-							err := database.QueryRow(`SELECT id FROM groups WHERE name = ?`, name).Scan(&id)
-							if err != nil {
-								if err == sql.ErrNoRows {
-									dialog.ShowError(fmt.Errorf("Группа '%s' не найдена", name), win)
-								} else {
-									dialog.ShowError(err, win)
-								}
-								return
-							}
-							_, err = database.Exec(`DELETE FROM entries WHERE group_id = ?`, id)
+							id, err := db.DeleteEntriesInGroup(database, name)
 							if err != nil {
 								dialog.ShowError(err, win)
 								return
@@ -262,7 +253,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 }
 
 func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
-	if hidePasswd{
+	if hidePasswd {
 		entry.Password = maskPassword(entry.Password)
 	}
 	text = fmt.Sprintf(`

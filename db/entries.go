@@ -156,7 +156,6 @@ func UpdateEntry(dbConn *sql.DB, key []byte, e models.PasswordEntry) error {
 	return err
 }
 
-// DeleteGroup удаляет все записи в группе (если нужно)
 func DeleteGroup(dbConn *sql.DB, id int) error {
 	_, err := dbConn.Exec(`DELETE FROM groups WHERE id = ?`, id)
 	return err
@@ -190,14 +189,30 @@ func GetGroup(dbConn *sql.DB) (listGroup []models.Groups, err error) {
 	return
 }
 
-func UpdateGroup(dbConn *sql.DB, oldName, newName string ) (err error){
+func UpdateGroup(dbConn *sql.DB, oldName, newName string) (err error) {
 	groupId, err := getOrCreateGroup(dbConn, oldName)
 	if err != nil {
 		return err
 	}
-	_, err = dbConn.Exec(`Update groups set name = ? where id = ?`, newName, groupId) 
+	_, err = dbConn.Exec(`Update groups set name = ? where id = ?`, newName, groupId)
 	if err != nil {
 		return err
+	}
+	return
+}
+
+func DeleteEntriesInGroup(dbConn *sql.DB, name string) ( id int, err error) {
+	err = dbConn.QueryRow(`SELECT id FROM groups WHERE name = ?`, name).Scan(&id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = fmt.Errorf("Группа '%s' не найдена", name)
+			return
+		} 
+		return
+	}
+	_, err = dbConn.Exec(`DELETE FROM entries WHERE group_id = ?`, id)
+	if err != nil {
+		return
 	}
 	return
 }
