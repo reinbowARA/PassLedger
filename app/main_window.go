@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -188,10 +189,19 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	)
 
 	// === Панель деталей ====
-	showPassBtn := widget.NewButtonWithIcon("Показать пароль", theme.VisibilityIcon(), nil)
-	copyBtn := widget.NewButtonWithIcon("Скопировать", theme.ContentCopyIcon(), nil)
-	passwordVisible := false
+	copyBtn := widget.NewButtonWithIcon("Скопировать пароль", theme.ContentCopyIcon(), nil)
+	timerProgress := widget.NewProgressBar()
+	timerProgress.TextFormatter = func() string {
+		return ""
+	}
+	timerProgress.Hide()
+	timerProgress.Max = 1
+	timerProgress.Min = 0
+	timerProgress.Value = 0
+	timerLabel := widget.NewLabel("")
+	timerLabel.Hide()
 	selectedEntry := models.PasswordEntry{}
+	var cancel chan struct{}
 
 	list.OnSelected = func(id widget.ListItemID) {
 		if id < 0 || id >= len(entries) {
@@ -204,30 +214,16 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 			return
 		}
 		selectedEntry = entries[id]
-		passwordVisible = false
 		var text string = ShowEntry(selectedEntry, true)
 		detail.ParseMarkdown(text)
-		showPassBtn.SetText("Показать пароль")
-		showPassBtn.Show() // ensure button is visible
-
-		showPassBtn.OnTapped = func() {
-			if passwordVisible {
-				// Скрыть пароль
-				var text string = ShowEntry(selectedEntry, true)
-				detail.ParseMarkdown(text)
-				showPassBtn.SetText("Показать пароль")
-				passwordVisible = false
-			} else {
-				// Показать пароль
-				var text string = ShowEntry(selectedEntry, false)
-				detail.ParseMarkdown(text)
-				showPassBtn.SetText("Скрыть пароль")
-				passwordVisible = true
-			}
-		}
 
 		copyBtn.OnTapped = func() {
-			win.Clipboard().SetContent(selectedEntry.Password)
+			if cancel != nil {
+				close(cancel)
+			}
+			cancel = make(chan struct{})
+			a.Clipboard().SetContent(selectedEntry.Password)
+			go runTimer(a, timerProgress, timerLabel, win, cancel)
 		}
 	}
 
@@ -236,8 +232,9 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		container.NewPadded(detail),
 		layout.NewSpacer(),
 		container.NewHBox(
-			container.NewPadded(showPassBtn),
 			container.NewPadded(copyBtn),
+			container.NewPadded(timerLabel),
+			container.NewPadded(timerProgress),
 		),
 	)
 
@@ -252,16 +249,52 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	win.Show()
 }
 
+func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label, win fyne.Window, cancel <-chan struct{}) {
+	fyne.DoAndWait(func() {
+		progress.SetValue(1.0)
+		progress.TextFormatter = func() string {
+			return fmt.Sprintf("%d сек", models.TIME_CLEAR_PASSWD)
+		}
+		timerLabel.SetText("Осталось: ")
+		timerLabel.Show()
+		progress.Show()
+	})
+	for i := models.TIME_CLEAR_PASSWD - 1; i >= 0; i-- {
+		select {
+		case <-cancel:
+			return
+		case <-time.After(time.Second):
+		}
+		secLeft := i
+		fyne.DoAndWait(func() {
+			if secLeft == 0 {
+				a.Clipboard().SetContent("")
+				timerLabel.Hide()
+				progress.Hide()
+			} else {
+				progress.SetValue(float64(secLeft)/float64(models.TIME_CLEAR_PASSWD))
+				progress.TextFormatter = func() string {
+					return fmt.Sprintf("%d сек", secLeft)
+				}
+				timerLabel.SetText("Осталось: ")
+			}
+		})
+		if secLeft == 0 {
+			return
+		}
+	}
+}
+
 func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
 	if hidePasswd {
 		entry.Password = maskPassword(entry.Password)
 	}
 	text = fmt.Sprintf(`
-	Название: %s
-	Логин: %s
-	Пароль: %s
-	URL: %s
-	Заметки: %s `,
+**Название:** %s
+**Логин:** %s
+**Пароль:** %s
+**URL:** %s
+**Заметки:** %s `,
 		entry.Title, entry.Username, entry.Password, entry.URL, entry.Notes)
 	return
 }

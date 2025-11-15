@@ -14,3 +14,7 @@ const (
 	NOTES  string = "Заметки"
 	GROUP  string = "Группа"
 )
+
+const(
+	TIME_CLEAR_PASSWD int = 10 //second
+)
