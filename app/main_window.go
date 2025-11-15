@@ -28,12 +28,14 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	detail.Wrapping = fyne.TextWrapWord
 	currentGroup := "Все"
 	searchText := ""
+	currentFilters := models.SearchFilters{Title: true, Username: true, URL: true}
 
 	// === Toolbar ===
 
 	addBtn := widget.NewButtonWithIcon("Добавить", theme.ContentAddIcon(), func() {
-		showAddForm(win, database, key, func() {
-			refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
+		showAddForm(win, database, key, func(filters models.SearchFilters) {
+			currentFilters = filters
+			refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
 			groupsSlice = getUniqueGroupsFromDB(database, key)
 			groupList.Refresh()
 		})
@@ -41,14 +43,20 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 
 	searchEntry := widget.NewEntry()
 	searchEntry.SetPlaceHolder("Поиск...")
+	searchEntry.OnChanged = func(text string) {
+		searchText = text
+		refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
+	}
 	searchBox := container.New(
 		layout.NewGridWrapLayout(fyne.NewSize(250, 36)),
 		searchEntry,
 	)
 
-	searchBtn := widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
-		searchText = searchEntry.Text
-		refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
+	// Кнопка для настройки фильтров
+	filterBtn := widget.NewButtonWithIcon("Фильтры", theme.SettingsIcon(), func() {
+		showFilterDialog(win, &currentFilters, func() {
+			refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
+		})
 	})
 
 	exitBtn := widget.NewButtonWithIcon("Выйти", theme.LogoutIcon(), func() {
@@ -57,7 +65,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	toolbar := container.NewHBox(
 		addBtn,
 		layout.NewSpacer(),
-		container.NewHBox(searchBox, searchBtn), // не сжимается
+		container.NewHBox(searchBox, filterBtn),
 		layout.NewSpacer(),
 		exitBtn,
 	)
@@ -107,7 +115,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				editBtn.Show()
 				delBtn.Show()
 				editBtn.OnTapped = func() {
-					showRenameGroup(win, name, &entries, &groupsSlice, groupList, database, key)
+					showRenameGroup(win, name, &entries, &groupsSlice, groupList, database, key, currentFilters, func() { refreshListFiltered(database, key, &entries, win, "Все", "", currentFilters, detail) })
 				}
 				delBtn.OnTapped = func() {
 					dialog.ShowConfirm("Удаление группы", "Удалить группу '"+name+"' и все её записи?", func(ok bool) {
@@ -125,7 +133,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 							}
 							groupsSlice = getUniqueGroupsFromDB(database, key)
 							groupList.Refresh()
-							refreshListFiltered(database, key, &entries, win, "Все", "")
+							refreshListFiltered(database, key, &entries, win, "Все", "", currentFilters, detail)
 						}
 					}, win)
 				}
@@ -135,7 +143,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 			// Нажатие на саму группу — фильтрация списка
 			rowBtn.OnTapped = func() {
 				currentGroup = name
-				refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
+				refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
 				list.Refresh()
 				win.Content().Refresh()
 				detail.ParseMarkdown("")
@@ -173,15 +181,16 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 			deleteBtn := btns.Objects[1].(*widget.Button)
 
 			editBtn.OnTapped = func() {
-				showAddForm(win, database, key, func() {
-					refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
+				showAddForm(win, database, key, func(filters models.SearchFilters) {
+					currentFilters = filters
+					refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
 				}, &entry)
 			}
 			deleteBtn.OnTapped = func() {
 				dialog.ShowConfirm("Удаление", "Удалить запись?", func(ok bool) {
 					if ok {
 						db.DeleteEntry(database, entry.ID)
-						refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
+						refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
 					}
 				}, win)
 			}

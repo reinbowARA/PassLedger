@@ -15,6 +15,14 @@ type FilterSettings struct {
 	Query string
 }
 
+type SearchFilters struct {
+	Title    bool
+	Username bool
+	URL      bool
+	Group    bool
+	Notes    bool
+}
+
 type Groups struct {
 	Id   int    `db:"id"`
 	Name string `db:"name"`

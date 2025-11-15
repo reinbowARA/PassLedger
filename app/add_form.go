@@ -12,7 +12,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), editEntry ...*models.PasswordEntry) {
+func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(filters models.SearchFilters), editEntry ...*models.PasswordEntry) {
 	var e models.PasswordEntry
 	editMode := len(editEntry) > 0
 	if editMode {
@@ -145,7 +145,7 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 			dialog.ShowError(err, win)
 			return
 		}
-		onSave()
+		onSave(models.SearchFilters{Title: true, Username: true, URL: true})
 	}
 
 	dialog.ShowCustomConfirm(
@@ -198,7 +198,7 @@ func showAddGroup(win fyne.Window, database *sql.DB, key []byte, groupsSlice *[]
 	)
 }
 
-func showRenameGroup(win fyne.Window, oldName string, entries *[]models.PasswordEntry, groupsSlice *[]string, groupList *widget.List, database *sql.DB, key []byte) {
+func showRenameGroup(win fyne.Window, oldName string, entries *[]models.PasswordEntry, groupsSlice *[]string, groupList *widget.List, database *sql.DB, key []byte, filters models.SearchFilters, onRefresh func()) {
 	entry := widget.NewEntry()
 	entry.SetText(oldName)
 	dialog.ShowCustomConfirm(
@@ -212,7 +212,7 @@ func showRenameGroup(win fyne.Window, oldName string, entries *[]models.Password
 				if newName != "" && newName != oldName {
 					db.UpdateGroup(database, oldName, newName)
 					*groupsSlice = getUniqueGroupsFromDB(database, key)
-					refreshListFiltered(database, key, entries, win, "Все", "")
+					onRefresh()
 					groupList.Refresh()
 				}
 			}

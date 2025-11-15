@@ -9,6 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -62,7 +63,7 @@ func maskPassword(p string) string {
 	return "********"
 }
 
-func refreshListFiltered(database *sql.DB, key []byte, entries *[]models.PasswordEntry, win fyne.Window, group, query string) {
+func refreshListFiltered(database *sql.DB, key []byte, entries *[]models.PasswordEntry, win fyne.Window, group, query string, filters models.SearchFilters, detail *widget.RichText) {
 	all, err := db.LoadAllEntries(database, key)
 	if err != nil {
 		ShowInfo(win, "Ошибка", "Не удалось загрузить записи: "+err.Error())
@@ -76,14 +77,70 @@ func refreshListFiltered(database *sql.DB, key []byte, entries *[]models.Passwor
 		}
 		if query != "" {
 			q := strings.ToLower(query)
-			if !strings.Contains(strings.ToLower(e.Title), q) &&
-				!strings.Contains(strings.ToLower(e.Username), q) &&
-				!strings.Contains(strings.ToLower(e.URL), q) {
+			matches := false
+			if filters.Title && strings.Contains(strings.ToLower(e.Title), q) {
+				matches = true
+			}
+			if filters.Username && strings.Contains(strings.ToLower(e.Username), q) {
+				matches = true
+			}
+			if filters.URL && strings.Contains(strings.ToLower(e.URL), q) {
+				matches = true
+			}
+			if filters.Group && strings.Contains(strings.ToLower(e.Group), q) {
+				matches = true
+			}
+			if filters.Notes && strings.Contains(strings.ToLower(e.Notes), q) {
+				matches = true
+			}
+			if !matches {
 				continue
 			}
 		}
 		filtered = append(filtered, e)
 	}
 	*entries = filtered
+	if len(filtered) == 0 && query != "" {
+		detail.ParseMarkdown("# Ничего не найдено\n\nПо запросу: `" + query + "`")
+	} else {
+		detail.ParseMarkdown("") // очищаем сообщение
+	}
+
 	win.Content().Refresh()
+}
+
+func showFilterDialog(win fyne.Window, filters *models.SearchFilters, onChange func()) {
+	titleCb := widget.NewCheck(models.TITLE, nil)
+	titleCb.SetChecked(filters.Title)
+
+	usernameCb := widget.NewCheck(models.LOGIN, nil)
+	usernameCb.SetChecked(filters.Username)
+
+	urlCb := widget.NewCheck(models.URL, nil)
+	urlCb.SetChecked(filters.URL)
+
+	groupCb := widget.NewCheck(models.GROUP, nil)
+	groupCb.SetChecked(filters.Group)
+
+	notesCb := widget.NewCheck(models.NOTES, nil)
+	notesCb.SetChecked(filters.Notes)
+
+	content := container.NewVBox(
+		titleCb,
+		usernameCb,
+		urlCb,
+		groupCb,
+		notesCb,
+	)
+
+	dialog.ShowCustomConfirm("Выберите поля для поиска", "Применить", "Отмена", content, func(ok bool) {
+		if ok {
+			filters.Title = titleCb.Checked
+			filters.Username = usernameCb.Checked
+			filters.URL = urlCb.Checked
+			filters.Group = groupCb.Checked
+			filters.Notes = notesCb.Checked
+			onChange()
+		}
+	}, win)
 }
