@@ -213,7 +213,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				button.OnTapped = setOnTapped
 			case 4:
 				button.Importance = widget.HighImportance
-				button.SetText("Действие")
+				button.SetIcon(theme.SettingsIcon())
+				button.SetText("")
 				button.OnTapped = func() {
 					buttonEdit := widget.NewButton("Редактировать", func() {
 						showAddForm(win, database, key, func(filters models.SearchFilters) {
@@ -276,7 +277,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	table.SetColumnWidth(1, 150) // Username
 	table.SetColumnWidth(2, 175) // URL
 	table.SetColumnWidth(3, 100) // Group
-	table.SetColumnWidth(4, 150) // Actions
+	table.SetColumnWidth(4, 50) // Actions
 
 	// === Панель деталей ====
 	copyBtn = widget.NewButtonWithIcon("Скопировать пароль", theme.ContentCopyIcon(), nil)
