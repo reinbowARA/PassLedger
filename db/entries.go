@@ -189,3 +189,15 @@ func GetGroup(dbConn *sql.DB) (listGroup []models.Groups, err error) {
 	}
 	return
 }
+
+func UpdateGroup(dbConn *sql.DB, oldName, newName string ) (err error){
+	groupId, err := getOrCreateGroup(dbConn, oldName)
+	if err != nil {
+		return err
+	}
+	_, err = dbConn.Exec(`Update groups set name = ? where id = ?`, newName, groupId) 
+	if err != nil {
+		return err
+	}
+	return
+}

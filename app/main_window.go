@@ -20,7 +20,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	win.Resize(fyne.NewSize(1000, 600))
 	win.CenterOnScreen()
 
-	groupsSlice := getUniqueGroups(entries)
+	groupsSlice := getUniqueGroupsFromDB(database, key)
 	var groupList *widget.List
 	var list *widget.List
 	detail := widget.NewRichText()
@@ -106,7 +106,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				editBtn.Show()
 				delBtn.Show()
 				editBtn.OnTapped = func() {
-					showRenameGroup(win, name, &entries, groupList, database, key)
+					showRenameGroup(win, name, &entries, &groupsSlice, groupList, database, key)
 				}
 				delBtn.OnTapped = func() {
 					dialog.ShowConfirm("Удаление группы", "Удалить группу '"+name+"' и все её записи?", func(ok bool) {

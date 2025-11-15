@@ -198,7 +198,7 @@ func showAddGroup(win fyne.Window, database *sql.DB, key []byte, groupsSlice *[]
 	)
 }
 
-func showRenameGroup(win fyne.Window, oldName string, entries *[]models.PasswordEntry, groupList *widget.List, database *sql.DB, key []byte) {
+func showRenameGroup(win fyne.Window, oldName string, entries *[]models.PasswordEntry, groupsSlice *[]string, groupList *widget.List, database *sql.DB, key []byte) {
 	entry := widget.NewEntry()
 	entry.SetText(oldName)
 	dialog.ShowCustomConfirm(
@@ -210,7 +210,8 @@ func showRenameGroup(win fyne.Window, oldName string, entries *[]models.Password
 			if ok {
 				newName := entry.Text
 				if newName != "" && newName != oldName {
-					_, _ = database.Exec(`UPDATE entries SET "group"=? WHERE "group"=?`, newName, oldName)
+					db.UpdateGroup(database, oldName, newName)
+					*groupsSlice = getUniqueGroupsFromDB(database, key)
 					refreshListFiltered(database, key, entries, win, "Все", "")
 					groupList.Refresh()
 				}
