@@ -255,11 +255,11 @@ func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label
 		progress.TextFormatter = func() string {
 			return fmt.Sprintf("%d сек", models.TIME_CLEAR_PASSWD)
 		}
-		timerLabel.SetText("Осталось: ")
+		timerLabel.SetText("До очистки буфера осталось: ")
 		timerLabel.Show()
 		progress.Show()
 	})
-	for i := models.TIME_CLEAR_PASSWD - 1; i >= 0; i-- {
+	for i := models.TIME_CLEAR_PASSWD; i >= 0; i-- {
 		select {
 		case <-cancel:
 			return
@@ -272,11 +272,11 @@ func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label
 				timerLabel.Hide()
 				progress.Hide()
 			} else {
-				progress.SetValue(float64(secLeft)/float64(models.TIME_CLEAR_PASSWD))
 				progress.TextFormatter = func() string {
 					return fmt.Sprintf("%d сек", secLeft)
 				}
-				timerLabel.SetText("Осталось: ")
+				progress.SetValue(float64(secLeft)/float64(models.TIME_CLEAR_PASSWD))
+				timerLabel.SetText("До очистки буфера осталось: ")
 			}
 		})
 		if secLeft == 0 {
