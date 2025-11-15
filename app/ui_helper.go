@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"strings"
 
 	"github.com/reinbowARA/PassLedger/db"
 	"github.com/reinbowARA/PassLedger/models"
@@ -52,4 +53,37 @@ func getUniqueGroupsFromDB(database *sql.DB, key []byte) []string {
 		out = append(out, g.Name)
 	}
 	return out
+}
+
+func maskPassword(p string) string {
+	if len(p) == 0 {
+		return ""
+	}
+	return "********"
+}
+
+func refreshListFiltered(database *sql.DB, key []byte, entries *[]models.PasswordEntry, win fyne.Window, group, query string) {
+	all, err := db.LoadAllEntries(database, key)
+	if err != nil {
+		ShowInfo(win, "Ошибка", "Не удалось загрузить записи: "+err.Error())
+		return
+	}
+
+	filtered := []models.PasswordEntry{}
+	for _, e := range all {
+		if group != "" && group != "Все" && e.Group != group {
+			continue
+		}
+		if query != "" {
+			q := strings.ToLower(query)
+			if !strings.Contains(strings.ToLower(e.Title), q) &&
+				!strings.Contains(strings.ToLower(e.Username), q) &&
+				!strings.Contains(strings.ToLower(e.URL), q) {
+				continue
+			}
+		}
+		filtered = append(filtered, e)
+	}
+	*entries = filtered
+	win.Content().Refresh()
 }

@@ -35,9 +35,7 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 	urlEntry.SetPlaceHolder("URL")
 	urlEntry.SetText(e.URL)
 
-	// Получаем список существующих групп из БД
 	existingGroups := getUniqueGroupsFromDB(database, key)
-	// Убираем "Все" из списка, так как это не настоящая группа
 	groupOptions := []string{}
 	for _, g := range existingGroups {
 		if g != "Все" {
@@ -164,7 +162,6 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 	)
 }
 
-// showAddGroup теперь принимает pointer на slice groups и саму группу list, а также database
 func showAddGroup(win fyne.Window, database *sql.DB, key []byte, groupsSlice *[]string, groupList *widget.List) {
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("Название новой группы")

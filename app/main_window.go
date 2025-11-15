@@ -3,7 +3,6 @@ package app
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -21,9 +20,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	win.Resize(fyne.NewSize(1000, 600))
 	win.CenterOnScreen()
 
-	// делаем pointer-like переменные которые используются в замыканиях:
 	groupsSlice := getUniqueGroups(entries)
-	var groupList *widget.List // обязательно объявить до использования
+	var groupList *widget.List
 	var list *widget.List
 	detail := widget.NewRichText()
 	detail.Wrapping = fyne.TextWrapWord
@@ -31,6 +29,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	searchText := ""
 
 	// === Toolbar ===
+
 	addBtn := widget.NewButtonWithIcon("Добавить", theme.ContentAddIcon(), func() {
 		showAddForm(win, database, key, func() {
 			refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
@@ -42,7 +41,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	searchEntry := widget.NewEntry()
 	searchEntry.SetPlaceHolder("Поиск...")
 	searchBox := container.New(
-		layout.NewGridWrapLayout(fyne.NewSize(250, 36)), // фиксируем ширину и высоту
+		layout.NewGridWrapLayout(fyne.NewSize(250, 36)),
 		searchEntry,
 	)
 
@@ -94,7 +93,6 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				delBtn.Hide()
 				rowBtn.Importance = widget.HighImportance
 				rowBtn.OnTapped = func() {
-					// добавляем новую группу в db (и обновляем список)
 					showAddGroup(win, database, key, &groupsSlice, groupList)
 				}
 				return
@@ -113,7 +111,6 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				delBtn.OnTapped = func() {
 					dialog.ShowConfirm("Удаление группы", "Удалить группу '"+name+"' и все её записи?", func(ok bool) {
 						if ok {
-							// получаем id группы по имени
 							var id int
 							err := database.QueryRow(`SELECT id FROM groups WHERE name = ?`, name).Scan(&id)
 							if err != nil {
@@ -124,22 +121,18 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 								}
 								return
 							}
-							// удаляем все записи в группе
 							_, err = database.Exec(`DELETE FROM entries WHERE group_id = ?`, id)
 							if err != nil {
 								dialog.ShowError(err, win)
 								return
 							}
-							// удаляем группу
 							err = db.DeleteGroup(database, id)
 							if err != nil {
 								dialog.ShowError(err, win)
 								return
 							}
-							// пересобираем groupsSlice и список
 							groupsSlice = getUniqueGroupsFromDB(database, key)
 							groupList.Refresh()
-							// обновляем записи, показывая "Все"
 							refreshListFiltered(database, key, &entries, win, "Все", "")
 						}
 					}, win)
@@ -153,7 +146,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				refreshListFiltered(database, key, &entries, win, currentGroup, searchText)
 				list.Refresh()
 				win.Content().Refresh()
-				detail.ParseMarkdown("") // сбрасываем детальную панель
+				detail.ParseMarkdown("")
 			}
 
 		},
@@ -223,8 +216,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	Логин: %s 
 	Пароль: %s 
 	URL: %s 
-	Заметки: %s `, 
-		e.Title, e.Username, maskPassword(e.Password), e.URL, e.Notes)
+	Заметки: %s `,
+			e.Title, e.Username, maskPassword(e.Password), e.URL, e.Notes)
 		detail.ParseMarkdown(text) //TODO переделать показ пароля
 
 		showPassBtn.OnTapped = func() {
@@ -233,8 +226,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	Логин: %s 
 	Пароль: %s 
 	URL: %s 
-	Заметки: %s `, 
-		e.Title, e.Username, e.Password, e.URL, e.Notes)
+	Заметки: %s `,
+				e.Title, e.Username, e.Password, e.URL, e.Notes)
 			detail.ParseMarkdown(text)
 		}
 
@@ -243,7 +236,6 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		}
 	}
 
-	//TODO
 	detailPanel := container.New(
 		layout.NewVBoxLayout(),
 		container.NewPadded(detail),
@@ -263,39 +255,4 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	content := container.NewBorder(toolbar, nil, nil, nil, mainContent)
 	win.SetContent(content)
 	win.Show()
-}
-
-// --- вспомогательные функции UI ---
-
-func maskPassword(p string) string {
-	if len(p) == 0 {
-		return ""
-	}
-	return "********"
-}
-
-func refreshListFiltered(database *sql.DB, key []byte, entries *[]models.PasswordEntry, win fyne.Window, group, query string) {
-	all, err := db.LoadAllEntries(database, key)
-	if err != nil {
-		ShowInfo(win, "Ошибка", "Не удалось загрузить записи: "+err.Error())
-		return
-	}
-
-	filtered := []models.PasswordEntry{}
-	for _, e := range all {
-		if group != "" && group != "Все" && e.Group != group {
-			continue
-		}
-		if query != "" {
-			q := strings.ToLower(query)
-			if !strings.Contains(strings.ToLower(e.Title), q) &&
-				!strings.Contains(strings.ToLower(e.Username), q) &&
-				!strings.Contains(strings.ToLower(e.URL), q) {
-				continue
-			}
-		}
-		filtered = append(filtered, e)
-	}
-	*entries = filtered
-	win.Content().Refresh()
 }
