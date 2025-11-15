@@ -7,6 +7,7 @@ import (
 	"github.com/reinbowARA/PassLedger/models"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
@@ -34,9 +35,76 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 	urlEntry.SetPlaceHolder("URL")
 	urlEntry.SetText(e.URL)
 
+	// Получаем список существующих групп из БД
+	existingGroups := getUniqueGroupsFromDB(database, key)
+	// Убираем "Все" из списка, так как это не настоящая группа
+	groupOptions := []string{}
+	for _, g := range existingGroups {
+		if g != "Все" {
+			groupOptions = append(groupOptions, g)
+		}
+	}
+	groupOptions = append(groupOptions, "") 
+	// Создаем выпадающий список для существующих групп
+	groupSelect := widget.NewSelect(groupOptions, nil)
+	groupSelect.PlaceHolder = "Выберите существующую группу"
+
+	if e.Group != "" {
+		// Проверяем, есть ли текущая группа в списке
+		found := false
+		for _, g := range groupOptions {
+			if g == e.Group {
+				found = true
+				groupSelect.SetSelected(e.Group)
+				break
+			}
+		}
+		// Если не нашли в списке, значит это новая группа
+		if !found {
+			groupSelect.Hide()
+		}
+	}
+
+	// Создаем поле для ввода новой группы
 	groupEntry := widget.NewEntry()
-	groupEntry.SetPlaceHolder("Группа")
-	groupEntry.SetText(e.Group)
+	groupEntry.SetPlaceHolder("Или введите новую группу")
+	if e.Group != "" {
+		// Проверяем, есть ли текущая группа в списке
+		found := false
+		for _, g := range groupOptions {
+			if g == e.Group {
+				found = true
+				break
+			}
+		}
+		// Если не нашли в списке, показываем её в поле ввода
+		if !found {
+			groupEntry.SetText(e.Group)
+		} else {
+			groupEntry.Hide()
+		}
+	}
+
+	// Логика взаимного скрытия
+	groupSelect.OnChanged = func(selected string) {
+		if selected != "" {
+			groupEntry.Hide()
+			groupEntry.SetText("")
+		} else {
+			groupEntry.Show()
+		}
+	}
+
+	groupEntry.OnChanged = func(text string) {
+		if text != "" {
+			groupSelect.Hide()
+			groupSelect.SetSelected("")
+		} else {
+			groupSelect.Show()
+		}
+	}
+
+	groupContainer := container.NewVBox(groupSelect, groupEntry)
 
 	notesEntry := widget.NewMultiLineEntry()
 	notesEntry.SetPlaceHolder("Заметки")
@@ -47,17 +115,23 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 		widget.NewFormItem("Логин", loginEntry),
 		widget.NewFormItem("Пароль", passEntry),
 		widget.NewFormItem("URL", urlEntry),
-		widget.NewFormItem("Группа", groupEntry),
+		widget.NewFormItem("Группа", groupContainer),
 		widget.NewFormItem("Заметки", notesEntry),
 	)
 
 	saveBtn := func() {
+		// Определяем группу: если выбрана из списка - используем её, иначе - из поля ввода
+		selectedGroup := groupSelect.Selected
+		if selectedGroup == "" {
+			selectedGroup = groupEntry.Text
+		}
+
 		newEntry := models.PasswordEntry{
 			Title:    titleEntry.Text,
 			Username: loginEntry.Text,
 			Password: passEntry.Text,
 			URL:      urlEntry.Text,
-			Group:    groupEntry.Text,
+			Group:    selectedGroup,
 			Notes:    notesEntry.Text,
 		}
 

@@ -40,7 +40,7 @@ func getUniqueGroups(entries []models.PasswordEntry) []string {
 	return out
 }
 
-// getUniqueGroupsFromDB грузит свежие группы из DB (если хочешь брать не из entries)
+// getUniqueGroupsFromDB грузит свежие группы из DB
 func getUniqueGroupsFromDB(database *sql.DB, key []byte) []string {
 	all, err := db.LoadAllEntries(database, key)
 	if err != nil {
