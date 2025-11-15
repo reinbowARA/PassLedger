@@ -275,7 +275,7 @@ func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label
 				progress.TextFormatter = func() string {
 					return fmt.Sprintf("%d сек", secLeft)
 				}
-				progress.SetValue(float64(secLeft)/float64(models.TIME_CLEAR_PASSWD))
+				progress.SetValue(float64(secLeft) / float64(models.TIME_CLEAR_PASSWD))
 				timerLabel.SetText("До очистки буфера осталось: ")
 			}
 		})
@@ -291,10 +291,11 @@ func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
 	}
 	text = fmt.Sprintf(`
 **Название:** %s
+**Группа:** %s
 **Логин:** %s
 **Пароль:** %s
 **URL:** %s
 **Заметки:** %s `,
-		entry.Title, entry.Username, entry.Password, entry.URL, entry.Notes)
+		entry.Title, entry.Group, entry.Username, entry.Password, entry.URL, entry.Notes)
 	return
 }
