@@ -3,6 +3,7 @@ package models
 const (
 	DefaultDBPath        string = "data/passwords.db"
 	DefaultDBCreateTable string = "db/table.sql"
+	DefaultNameAllGroups string = "Все"
 )
 
 // form name
@@ -15,6 +16,13 @@ const (
 	GROUP  string = "Группа"
 )
 
-const(
+const (
 	TIME_CLEAR_PASSWD int = 10 //second
 )
+
+const (
+	CANCEL string = "Отмена"
+	SAVE   string = "Сохранить"
+	CREATE string = "Создать"
+	CONFIRM string = "Применить"
+) 

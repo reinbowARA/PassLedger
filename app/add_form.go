@@ -38,11 +38,11 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(filt
 	existingGroups := getUniqueGroupsFromDB(database, key)
 	groupOptions := []string{}
 	for _, g := range existingGroups {
-		if g != "Все" {
+		if g != models.DefaultNameAllGroups {
 			groupOptions = append(groupOptions, g)
 		}
 	}
-	groupOptions = append(groupOptions, "") 
+	groupOptions = append(groupOptions, "")
 	// Создаем выпадающий список для существующих групп
 	groupSelect := widget.NewSelect(groupOptions, nil)
 	groupSelect.PlaceHolder = "Выберите существующую группу"
@@ -149,9 +149,9 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(filt
 	}
 
 	dialog.ShowCustomConfirm(
-		"Добавить учётку",
-		"Сохранить",
-		"Отмена",
+		"Добавить учётную запись",
+		models.SAVE,
+		models.CANCEL,
 		form,
 		func(ok bool) {
 			if ok {
@@ -168,8 +168,8 @@ func showAddGroup(win fyne.Window, database *sql.DB, key []byte, groupsSlice *[]
 
 	dialog.ShowCustomConfirm(
 		"Добавить группу",
-		"Создать",
-		"Отмена",
+		models.CREATE,
+		models.CANCEL,
 		entry,
 		func(ok bool) {
 			if ok {
@@ -203,8 +203,8 @@ func showRenameGroup(win fyne.Window, oldName string, entries *[]models.Password
 	entry.SetText(oldName)
 	dialog.ShowCustomConfirm(
 		"Переименовать группу",
-		"Сохранить",
-		"Отмена",
+		models.SAVE,
+		models.CANCEL,
 		entry,
 		func(ok bool) {
 			if ok {

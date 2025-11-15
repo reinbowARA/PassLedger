@@ -26,7 +26,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	var list *widget.List
 	detail := widget.NewRichText()
 	detail.Wrapping = fyne.TextWrapWord
-	currentGroup := "Все"
+	currentGroup := models.DefaultNameAllGroups
 	searchText := ""
 	currentFilters := models.SearchFilters{Title: true, Username: true, URL: true}
 
@@ -107,15 +107,17 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 				return
 			}
 
-			// Для группы "Все" запрещаем редактировать/удалять
-			if name == "Все" {
+			// Для группы models.DefaultNameAllGroups запрещаем редактировать/удалять
+			if name == models.DefaultNameAllGroups {
 				editBtn.Hide()
 				delBtn.Hide()
 			} else {
 				editBtn.Show()
 				delBtn.Show()
 				editBtn.OnTapped = func() {
-					showRenameGroup(win, name, &entries, &groupsSlice, groupList, database, key, currentFilters, func() { refreshListFiltered(database, key, &entries, win, "Все", "", currentFilters, detail) })
+					showRenameGroup(win, name, &entries, &groupsSlice, groupList, database, key, currentFilters, func() {
+						refreshListFiltered(database, key, &entries, win, models.DefaultNameAllGroups, "", currentFilters, detail)
+					})
 				}
 				delBtn.OnTapped = func() {
 					dialog.ShowConfirm("Удаление группы", "Удалить группу '"+name+"' и все её записи?", func(ok bool) {
@@ -133,7 +135,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 							}
 							groupsSlice = getUniqueGroupsFromDB(database, key)
 							groupList.Refresh()
-							refreshListFiltered(database, key, &entries, win, "Все", "", currentFilters, detail)
+							refreshListFiltered(database, key, &entries, win, models.DefaultNameAllGroups, "", currentFilters, detail)
 						}
 					}, win)
 				}

@@ -25,31 +25,14 @@ func ShowInfo(win fyne.Window, title, message string) {
 	pop.Show()
 }
 
-// getUniqueGroups берёт группы из текущего слайса entries и возвращает с "Все" первым
-func getUniqueGroups(entries []models.PasswordEntry) []string {
-	seen := map[string]bool{}
-	out := []string{"Все"}
-	for _, e := range entries {
-		g := e.Group
-		if g == "" || g == "Все" {
-			continue
-		}
-		if !seen[g] {
-			seen[g] = true
-			out = append(out, g)
-		}
-	}
-	return out
-}
-
 // getUniqueGroupsFromDB грузит свежие группы из DB
 func getUniqueGroupsFromDB(database *sql.DB, key []byte) []string {
 	groups, err := db.GetGroup(database)
 	if err != nil {
-		// если ошибка — возвращаем пустой набор кроме "Все"
-		return []string{"Все"}
+		// если ошибка — возвращаем пустой набор кроме models.DefaultNameAllGroups
+		return []string{models.DefaultNameAllGroups}
 	}
-	out := []string{"Все"}
+	out := []string{models.DefaultNameAllGroups}
 	for _, g := range groups {
 		out = append(out, g.Name)
 	}
@@ -72,7 +55,7 @@ func refreshListFiltered(database *sql.DB, key []byte, entries *[]models.Passwor
 
 	filtered := []models.PasswordEntry{}
 	for _, e := range all {
-		if group != "" && group != "Все" && e.Group != group {
+		if group != "" && group != models.DefaultNameAllGroups && e.Group != group {
 			continue
 		}
 		if query != "" {
@@ -133,7 +116,7 @@ func showFilterDialog(win fyne.Window, filters *models.SearchFilters, onChange f
 		notesCb,
 	)
 
-	dialog.ShowCustomConfirm("Выберите поля для поиска", "Применить", "Отмена", content, func(ok bool) {
+	dialog.ShowCustomConfirm("Выберите поля для поиска", models.CONFIRM, models.CANCEL, content, func(ok bool) {
 		if ok {
 			filters.Title = titleCb.Checked
 			filters.Username = usernameCb.Checked
