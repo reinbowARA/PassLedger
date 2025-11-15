@@ -1,6 +1,16 @@
 package models
 
 const (
-	AddGroupNodeID = "__add_group__"
-	DefaultDBPath  = "data/passwords.db"
+	DefaultDBPath        string = "data/passwords.db"
+	DefaultDBCreateTable string = "db/table.sql"
+)
+
+// form name
+const (
+	TITLE  string = "Название"
+	LOGIN  string = "Логин"
+	PASSWD string = "Пароль"
+	URL    string = "URL"
+	NOTES  string = "Заметки"
+	GROUP  string = "Группа"
 )

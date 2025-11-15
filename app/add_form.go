@@ -20,19 +20,19 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 	}
 
 	titleEntry := widget.NewEntry()
-	titleEntry.SetPlaceHolder("Название")
+	titleEntry.SetPlaceHolder(models.TITLE)
 	titleEntry.SetText(e.Title)
 
 	loginEntry := widget.NewEntry()
-	loginEntry.SetPlaceHolder("Логин")
+	loginEntry.SetPlaceHolder(models.LOGIN)
 	loginEntry.SetText(e.Username)
 
 	passEntry := widget.NewPasswordEntry()
-	passEntry.SetPlaceHolder("Пароль")
+	passEntry.SetPlaceHolder(models.PASSWD)
 	passEntry.SetText(e.Password)
 
 	urlEntry := widget.NewEntry()
-	urlEntry.SetPlaceHolder("URL")
+	urlEntry.SetPlaceHolder(models.URL)
 	urlEntry.SetText(e.URL)
 
 	existingGroups := getUniqueGroupsFromDB(database, key)
@@ -105,16 +105,16 @@ func showAddForm(win fyne.Window, database *sql.DB, key []byte, onSave func(), e
 	groupContainer := container.NewVBox(groupSelect, groupEntry)
 
 	notesEntry := widget.NewMultiLineEntry()
-	notesEntry.SetPlaceHolder("Заметки")
+	notesEntry.SetPlaceHolder(models.NOTES)
 	notesEntry.SetText(e.Notes)
 
 	form := widget.NewForm(
-		widget.NewFormItem("Название", titleEntry),
-		widget.NewFormItem("Логин", loginEntry),
-		widget.NewFormItem("Пароль", passEntry),
-		widget.NewFormItem("URL", urlEntry),
-		widget.NewFormItem("Группа", groupContainer),
-		widget.NewFormItem("Заметки", notesEntry),
+		widget.NewFormItem(models.TITLE, titleEntry),
+		widget.NewFormItem(models.LOGIN, loginEntry),
+		widget.NewFormItem(models.PASSWD, passEntry),
+		widget.NewFormItem(models.URL, urlEntry),
+		widget.NewFormItem(models.GROUP, groupContainer),
+		widget.NewFormItem(models.NOTES, notesEntry),
 	)
 
 	saveBtn := func() {

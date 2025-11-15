@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/reinbowARA/PassLedger/crypto"
+	"github.com/reinbowARA/PassLedger/models"
 )
 
 func OpenOrCreateDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error) {
@@ -25,7 +26,7 @@ func CreateNewDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error) {
 		return nil, nil, err
 	}
 
-	schema, err := os.ReadFile("db/table.sql")
+	schema, err := os.ReadFile(models.DefaultDBCreateTable)
 	if err != nil {
 		return nil, nil, err
 	}
