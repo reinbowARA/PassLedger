@@ -23,7 +23,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 
 	groupsSlice := getUniqueGroupsFromDB(database, key)
 	var groupList *widget.List
-	var list *widget.List
+	var table *widget.Table
+	var popup *widget.PopUp
 	detail := widget.NewRichText()
 	detail.Wrapping = fyne.TextWrapWord
 	currentGroup := models.DefaultNameAllGroups
@@ -69,6 +70,19 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		layout.NewSpacer(),
 		exitBtn,
 	)
+
+	copyBtn := widget.NewButtonWithIcon("Скопировать пароль", theme.ContentCopyIcon(), nil)
+	timerProgress := widget.NewProgressBar()
+	timerProgress.TextFormatter = func() string {
+		return ""
+	}
+	timerProgress.Hide()
+	timerProgress.Max = 1
+	timerProgress.Min = 0
+	timerProgress.Value = 0
+	timerLabel := widget.NewLabel("")
+	timerLabel.Hide()
+	var cancel chan struct{}
 
 	// === Группы ===
 
@@ -140,13 +154,11 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 					}, win)
 				}
 			}
-			list.UnselectAll()
-
 			// Нажатие на саму группу — фильтрация списка
 			rowBtn.OnTapped = func() {
 				currentGroup = name
 				refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
-				list.Refresh()
+				table.Refresh()
 				win.Content().Refresh()
 				detail.ParseMarkdown("")
 			}
@@ -155,53 +167,120 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	)
 
 	// === Учётки ===
-	list = widget.NewList(
-		func() int { return len(entries) },
+	table = widget.NewTableWithHeaders(
+		func() (int, int) { return len(entries), 5 }, // 5 колонок: Title, Username, URL, Group, Actions
 		func() fyne.CanvasObject {
-			title := widget.NewLabel("")
-			login := widget.NewLabel("")
-			editBtn := widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), nil)
-			deleteBtn := widget.NewButtonWithIcon("", theme.DeleteIcon(), nil)
-			return container.NewBorder(nil, nil, nil,
-				container.NewHBox(editBtn, deleteBtn),
-				container.NewVBox(title, login))
+			return widget.NewButton("", nil)
 		},
-		func(i widget.ListItemID, o fyne.CanvasObject) {
-			if i < 0 || i >= len(entries) {
+		func(i widget.TableCellID, o fyne.CanvasObject) {
+			button, ok := o.(*widget.Button)
+			if !ok {
 				return
 			}
-			entry := entries[i]
-			c := o.(*fyne.Container)
-			vbox := c.Objects[0].(*fyne.Container)
-			title := vbox.Objects[0].(*widget.Label)
-			login := vbox.Objects[1].(*widget.Label)
-			title.SetText(entry.Title)
-			login.SetText(fmt.Sprintf("👤 %s", entry.Username))
-
-			btns := c.Objects[1].(*fyne.Container)
-			editBtn := btns.Objects[0].(*widget.Button)
-			deleteBtn := btns.Objects[1].(*widget.Button)
-
-			editBtn.OnTapped = func() {
-				showAddForm(win, database, key, func(filters models.SearchFilters) {
-					currentFilters = filters
-					refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
-				}, &entry)
+			if i.Row < 0 || i.Row >= len(entries) {
+				button.SetText("")
+				return
 			}
-			deleteBtn.OnTapped = func() {
-				dialog.ShowConfirm("Удаление", "Удалить запись?", func(ok bool) {
-					if ok {
-						db.DeleteEntry(database, entry.ID)
-						refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
+			entry := entries[i.Row]
+			setOnTapped := func() {
+				var text string = ShowEntry(entry, true)
+				detail.ParseMarkdown(text)
+				copyBtn.OnTapped = func() {
+					if cancel != nil {
+						close(cancel)
 					}
-				}, win)
+					cancel = make(chan struct{})
+					a.Clipboard().SetContent(entry.Password)
+					go runTimer(a, timerProgress, timerLabel, win, cancel)
+				}
+			}
+			switch i.Col {
+			case 0:
+				button.Importance = widget.LowImportance
+				button.SetText(entry.Title)
+				button.OnTapped = setOnTapped
+			case 1:
+				button.Importance = widget.LowImportance
+				button.SetText(entry.Username)
+				button.OnTapped = setOnTapped
+			case 2:
+				button.Importance = widget.LowImportance
+				button.SetText(entry.URL)
+				button.OnTapped = setOnTapped
+			case 3:
+				button.Importance = widget.LowImportance
+				button.SetText(entry.Group)
+				button.OnTapped = setOnTapped
+			case 4:
+				button.Importance = widget.HighImportance
+				button.SetText("Действие")
+				button.OnTapped = func() {
+					buttonEdit := widget.NewButton("Редактировать", func() {
+						showAddForm(win, database, key, func(filters models.SearchFilters) {
+							currentFilters = filters
+							refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
+							groupsSlice = getUniqueGroupsFromDB(database, key)
+							groupList.Refresh()
+							popup.Hide()
+						}, &entry)
+					})
+					buttonDelete := widget.NewButton("Удалить", func() {
+						dialog.ShowConfirm("Удаление", "Удалить запись?", func(ok bool) {
+							if ok {
+								db.DeleteEntry(database, entry.ID)
+								refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
+								groupsSlice = getUniqueGroupsFromDB(database, key)
+								groupList.Refresh()
+								popup.Hide()
+							}
+						}, win)
+					})
+
+					closeBtn := widget.NewButton("Отмена", func() {
+						popup.Hide()
+					})
+
+					content := container.NewVBox(buttonEdit, buttonDelete, closeBtn)
+					popup = widget.NewModalPopUp(content, win.Canvas())
+					popup.Show()
+					//dialog.ShowCustom("Действие", models.CANCEL, content, win)
+				}
 			}
 		},
 	)
+	table.UpdateHeader = func(id widget.TableCellID, template fyne.CanvasObject) {
+		label, ok := template.(*widget.Label)
+		if !ok {
+			return
+		}
+		if id.Row < 0 {
+			// Заголовки колонок
+			switch id.Col {
+			case 0:
+				label.SetText(models.TITLE)
+			case 1:
+				label.SetText(models.LOGIN)
+			case 2:
+				label.SetText(models.URL)
+			case 3:
+				label.SetText(models.GROUP)
+			case 4:
+				label.SetText("")
+			}
+		} else if id.Col < 0 {
+			// Заголовки строк
+			label.SetText(fmt.Sprintf("%d", id.Row+1))
+		}
+	}
+	table.SetColumnWidth(0, 150) // Title
+	table.SetColumnWidth(1, 150) // Username
+	table.SetColumnWidth(2, 175) // URL
+	table.SetColumnWidth(3, 100) // Group
+	table.SetColumnWidth(4, 150) // Actions
 
 	// === Панель деталей ====
-	copyBtn := widget.NewButtonWithIcon("Скопировать пароль", theme.ContentCopyIcon(), nil)
-	timerProgress := widget.NewProgressBar()
+	copyBtn = widget.NewButtonWithIcon("Скопировать пароль", theme.ContentCopyIcon(), nil)
+	timerProgress = widget.NewProgressBar()
 	timerProgress.TextFormatter = func() string {
 		return ""
 	}
@@ -209,34 +288,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	timerProgress.Max = 1
 	timerProgress.Min = 0
 	timerProgress.Value = 0
-	timerLabel := widget.NewLabel("")
+	timerLabel = widget.NewLabel("")
 	timerLabel.Hide()
-	selectedEntry := models.PasswordEntry{}
-	var cancel chan struct{}
-
-	list.OnSelected = func(id widget.ListItemID) {
-		if id < 0 || id >= len(entries) {
-			detail.ParseMarkdown("") // очищаем
-			return
-		}
-	}
-	list.OnSelected = func(id widget.ListItemID) {
-		if id < 0 || id >= len(entries) {
-			return
-		}
-		selectedEntry = entries[id]
-		var text string = ShowEntry(selectedEntry, true)
-		detail.ParseMarkdown(text)
-
-		copyBtn.OnTapped = func() {
-			if cancel != nil {
-				close(cancel)
-			}
-			cancel = make(chan struct{})
-			a.Clipboard().SetContent(selectedEntry.Password)
-			go runTimer(a, timerProgress, timerLabel, win, cancel)
-		}
-	}
 
 	detailPanel := container.New(
 		layout.NewVBoxLayout(),
@@ -250,7 +303,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	)
 
 	// === Макет ===
-	vs := container.NewVSplit(list, detailPanel)
+	vs := container.NewVSplit(table, detailPanel)
 	//vs.SetOffset(0.2)
 	mainContent := container.NewHSplit(groupList, vs)
 	mainContent.SetOffset(0.2)
