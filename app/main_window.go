@@ -30,6 +30,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	currentGroup := models.DefaultNameAllGroups
 	searchText := ""
 	currentFilters := models.SearchFilters{Title: true, Username: true, URL: true}
+	var selectedRow = -1
 
 	// === Toolbar ===
 
@@ -156,6 +157,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 			}
 			// Нажатие на саму группу — фильтрация списка
 			rowBtn.OnTapped = func() {
+				selectedRow = -1
 				currentGroup = name
 				refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
 				table.Refresh()
@@ -183,6 +185,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 			}
 			entry := entries[i.Row]
 			setOnTapped := func() {
+				selectedRow = i.Row
+				table.Refresh()
 				var text string = ShowEntry(entry, true)
 				detail.ParseMarkdown(text)
 				copyBtn.OnTapped = func() {
@@ -194,28 +198,43 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 					go runTimer(a, timerProgress, timerLabel, win, cancel)
 				}
 			}
+			// Установка выделения строки
+			if i.Row == selectedRow {
+				if i.Col < 4 {
+					button.Importance = widget.WarningImportance // Выделение выбранной строки
+				} else {
+					button.Importance = widget.HighImportance
+				}
+			} else {
+				if i.Col < 4 {
+					button.Importance = widget.LowImportance // Нормальный стиль
+				} else {
+					button.Importance = widget.HighImportance
+				}
+			}
 			switch i.Col {
 			case 0:
-				button.Importance = widget.LowImportance
+				button.SetIcon(nil)
 				button.SetText(entry.Title)
 				button.OnTapped = setOnTapped
 			case 1:
-				button.Importance = widget.LowImportance
+				button.SetIcon(nil)
 				button.SetText(entry.Username)
 				button.OnTapped = setOnTapped
 			case 2:
-				button.Importance = widget.LowImportance
+				button.SetIcon(nil)
 				button.SetText(entry.URL)
 				button.OnTapped = setOnTapped
 			case 3:
-				button.Importance = widget.LowImportance
+				button.SetIcon(nil)
 				button.SetText(entry.Group)
 				button.OnTapped = setOnTapped
 			case 4:
-				button.Importance = widget.HighImportance
 				button.SetIcon(theme.SettingsIcon())
 				button.SetText("")
 				button.OnTapped = func() {
+					selectedRow = i.Row
+					table.Refresh()
 					buttonEdit := widget.NewButton("Редактировать", func() {
 						showAddForm(win, database, key, func(filters models.SearchFilters) {
 							currentFilters = filters
@@ -244,7 +263,6 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 					content := container.NewVBox(buttonEdit, buttonDelete, closeBtn)
 					popup = widget.NewModalPopUp(content, win.Canvas())
 					popup.Show()
-					//dialog.ShowCustom("Действие", models.CANCEL, content, win)
 				}
 			}
 		},
