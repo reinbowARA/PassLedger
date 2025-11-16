@@ -19,9 +19,12 @@ func OpenOrCreateDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error
 	return OpenAndAuthenticate(dbPath, masterPassword)
 }
 
-func CreateNewDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error) {
-	os.MkdirAll(filepath.Dir(dbPath), 0700)
-	db, err := sql.Open("sqlite3", dbPath)
+func CreateNewDatabase(dbPath, masterPassword string) (db *sql.DB, key []byte, err error) {
+	err = os.MkdirAll(filepath.Dir(dbPath), 0700)
+	if err != nil {
+		return
+	}
+	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -36,7 +39,7 @@ func CreateNewDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error) {
 
 	salt, _ := crypto.GenerateSalt(16)
 	iterations := 20000
-	key, _ := crypto.DeriveKeyFromPassword([]byte(masterPassword), salt, iterations)
+	key, _ = crypto.DeriveKeyFromPassword([]byte(masterPassword), salt, iterations)
 	verifier := crypto.HMACStreebog256(key, []byte("verifier"))
 	_, err = db.Exec(`INSERT INTO meta (id, salt, iterations, verifier) VALUES (1, ?, ?, ?)`, salt, iterations, verifier)
 	if err != nil {

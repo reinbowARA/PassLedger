@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/reinbowARA/PassLedger/db"
-	"github.com/reinbowARA/PassLedger/models"
 )
 
 func ShowLoginWindow(a fyne.App) {
@@ -18,9 +17,11 @@ func ShowLoginWindow(a fyne.App) {
 	// Resize will be set later based on isFirstTime
 	win.CenterOnScreen()
 
-	dbPath := models.DefaultDBPath
+	settings, _ := LoadSettings()
+
+	var dbPath string = settings.DBPath
 	isFirstTime := false
-	if _, e := os.Stat(dbPath); os.IsNotExist(e) {
+	if stat, e := os.Stat(dbPath); os.IsNotExist(e) || (e == nil && stat.Size() == 0) {
 		isFirstTime = true
 	}
 

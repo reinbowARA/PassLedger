@@ -27,3 +27,9 @@ type Groups struct {
 	Id   int    `db:"id"`
 	Name string `db:"name"`
 }
+
+type Settings struct {
+	DBPath       string `json:"db_path"`
+	ThemeVariant int    `json:"theme_variant"`
+	TimerSeconds int    `json:"timer_seconds"`
+}

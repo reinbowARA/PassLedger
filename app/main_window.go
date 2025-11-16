@@ -9,6 +9,8 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+
+	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -61,6 +63,29 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		})
 	})
 
+	settings, err := LoadSettings()
+	if err != nil {
+		dialog.ShowError(err, win)
+		return
+	}
+
+	SettingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
+		showSettingsForm(win, &settings, a, func(newSettings models.Settings) {
+			settings = newSettings
+			err := SaveSettings(settings)
+			if err != nil {
+				dialog.ShowError(err, win)
+				return
+			}
+			// themeStr := "dark"
+			// if newSettings.ThemeVariant == 0 {
+			// 	themeStr = "light"
+			// }
+			// a.Preferences().SetString("Theme", themeStr)
+			//dialog.ShowInformation("Настройки", "Настройки сохранены. Для применения новой темы перезапустите приложение.", win)
+		})
+	})
+
 	exitBtn := widget.NewButtonWithIcon("Выйти", theme.LogoutIcon(), func() {
 		a.Quit()
 	})
@@ -69,6 +94,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		layout.NewSpacer(),
 		container.NewHBox(searchBox, filterBtn),
 		layout.NewSpacer(),
+		SettingsBtn,
 		exitBtn,
 	)
 
@@ -195,7 +221,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 					}
 					cancel = make(chan struct{})
 					a.Clipboard().SetContent(entry.Password)
-					go runTimer(a, timerProgress, timerLabel, win, cancel)
+					go runTimer(a, timerProgress, timerLabel, win, cancel, settings.TimerSeconds)
 				}
 			}
 			// Установка выделения строки
@@ -295,7 +321,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	table.SetColumnWidth(1, 150) // Username
 	table.SetColumnWidth(2, 175) // URL
 	table.SetColumnWidth(3, 100) // Group
-	table.SetColumnWidth(4, 50) // Actions
+	table.SetColumnWidth(4, 50)  // Actions
 
 	// === Панель деталей ====
 	copyBtn = widget.NewButtonWithIcon("Скопировать пароль", theme.ContentCopyIcon(), nil)
@@ -332,17 +358,17 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	win.Show()
 }
 
-func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label, win fyne.Window, cancel <-chan struct{}) {
+func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label, win fyne.Window, cancel <-chan struct{}, timerSeconds int) {
 	fyne.DoAndWait(func() {
 		progress.SetValue(1.0)
 		progress.TextFormatter = func() string {
-			return fmt.Sprintf("%d сек", models.TIME_CLEAR_PASSWD)
+			return fmt.Sprintf("%d сек", timerSeconds)
 		}
 		timerLabel.SetText("До очистки буфера осталось: ")
 		timerLabel.Show()
 		progress.Show()
 	})
-	for i := models.TIME_CLEAR_PASSWD; i >= 0; i-- {
+	for i := timerSeconds; i >= 0; i-- {
 		select {
 		case <-cancel:
 			return
@@ -358,7 +384,7 @@ func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label
 				progress.TextFormatter = func() string {
 					return fmt.Sprintf("%d сек", secLeft)
 				}
-				progress.SetValue(float64(secLeft) / float64(models.TIME_CLEAR_PASSWD))
+				progress.SetValue(float64(secLeft) / float64(timerSeconds))
 				timerLabel.SetText("До очистки буфера осталось: ")
 			}
 		})
@@ -381,4 +407,112 @@ func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
 **Заметки:** %s `,
 		entry.Title, entry.Group, entry.Username, entry.Password, entry.URL, entry.Notes)
 	return
+}
+
+func showSettingsForm(parent fyne.Window,  currentSettings *models.Settings, a fyne.App,onSave func(models.Settings)) {
+	settingsWin := fyne.CurrentApp().NewWindow("Настройки")
+	settingsWin.Resize(fyne.NewSize(600, 400))
+	settingsWin.CenterOnScreen()
+
+	var lightBtn, darkBtn *widget.Button
+
+	dbPathEntry := widget.NewEntry()
+	dbPathEntry.SetText(currentSettings.DBPath)
+	dbPathEntry.SetPlaceHolder("Путь к файлу базы данных")
+	dbPathEntry.Disable() // Делаем его не редактируемым, только через выбор
+
+	selectBtn := widget.NewButtonWithIcon("Выбрать файл", theme.FolderOpenIcon(), func() {
+		fd := dialog.NewFileOpen(func(uc fyne.URIReadCloser, e error) {
+			if uc != nil {
+				path := uc.URI().Path()
+				dbPathEntry.SetText(path)
+			}
+		}, settingsWin)
+		filter := storage.NewExtensionFileFilter([]string{".db"})
+		fd.SetFilter(filter)
+		fd.Resize(fyne.NewSize(800, 600))
+		fd.Show()
+	})
+
+	createBtn := widget.NewButtonWithIcon("Создать файл", theme.ContentAddIcon(), func() {
+		fd := dialog.NewFileSave(func(uc fyne.URIWriteCloser, e error) {
+			if uc != nil {
+				path := uc.URI().Path()
+				dbPathEntry.SetText(path)
+			}
+		}, settingsWin)
+		filter := storage.NewExtensionFileFilter([]string{".db"})
+		fd.SetFilter(filter)
+		fd.Resize(fyne.NewSize(800, 600))
+		fd.Show()
+	})
+
+	dbPathContainer := container.NewBorder(container.NewHBox(selectBtn, createBtn), nil, nil, nil, dbPathEntry)
+
+	lightBtn = widget.NewButton("Светлая", func() {
+		currentSettings.ThemeVariant = 0
+		lightBtn.Importance = widget.HighImportance
+		darkBtn.Importance = widget.LowImportance
+		settingsWin.Content().Refresh()
+		a.Settings().SetTheme(theme.LightTheme())
+	})
+	darkBtn = widget.NewButton("Темная", func() {
+		currentSettings.ThemeVariant = 1
+		darkBtn.Importance = widget.HighImportance
+		lightBtn.Importance = widget.LowImportance
+		settingsWin.Content().Refresh()
+		a.Settings().SetTheme(theme.DarkTheme())
+	})
+	if currentSettings.ThemeVariant == 0 {
+		lightBtn.Importance = widget.HighImportance
+		darkBtn.Importance = widget.LowImportance
+	} else {
+		lightBtn.Importance = widget.LowImportance
+		darkBtn.Importance = widget.HighImportance
+	}
+	themeContainer := container.NewGridWithColumns(2, lightBtn, darkBtn)
+
+	timerSlider := widget.NewSlider(1, 60)
+	timerSlider.SetValue(float64(currentSettings.TimerSeconds))
+	timerLabel := widget.NewLabel(fmt.Sprintf("%d сек", currentSettings.TimerSeconds))
+	timerSlider.OnChanged = func(value float64) {
+		currentSettings.TimerSeconds = int(value)
+		timerLabel.SetText(fmt.Sprintf("%.0f сек", value))
+	}
+
+	timerContainer := container.NewVBox(timerSlider, timerLabel)
+
+	form := widget.NewForm(
+		widget.NewFormItem("Путь к БД*", dbPathContainer),
+		widget.NewFormItem("Тема", themeContainer),
+		widget.NewFormItem("Таймер очистки буфера (сек)", timerContainer),
+	)
+
+	saveBtn := widget.NewButtonWithIcon("Сохранить", theme.ConfirmIcon(), func() {
+		newSettings := models.Settings{
+			DBPath:       dbPathEntry.Text,
+			ThemeVariant: currentSettings.ThemeVariant,
+			TimerSeconds: currentSettings.TimerSeconds,
+		}
+		onSave(newSettings)
+		settingsWin.Close()
+	})
+
+	cancelBtn := widget.NewButtonWithIcon("Отмена", theme.CancelIcon(), func() {
+		settingsWin.Close()
+	})
+
+	content := container.NewVBox(
+		form,
+		layout.NewSpacer(),
+		widget.NewRichTextWithText("* - изменения вступят в силу после перезапуска!"),
+		container.NewHBox(
+			layout.NewSpacer(),
+			saveBtn,
+			cancelBtn,
+		),
+	)
+
+	settingsWin.SetContent(container.NewPadded(content))
+	settingsWin.Show()
 }
