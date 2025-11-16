@@ -55,7 +55,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	)
 
 	// Кнопка для настройки фильтров
-	filterBtn := widget.NewButtonWithIcon("Фильтры", theme.SettingsIcon(), func() {
+	filterBtn := widget.NewButtonWithIcon("Фильтры", theme.MenuIcon(), func() {
 		showFilterDialog(win, &currentFilters, func() {
 			refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
 		})
