@@ -409,10 +409,14 @@ func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
 	return
 }
 
-func showSettingsForm(parent fyne.Window,  currentSettings *models.Settings, a fyne.App,onSave func(models.Settings)) {
+func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fyne.App, onSave func(models.Settings)) {
 	settingsWin := fyne.CurrentApp().NewWindow("Настройки")
 	settingsWin.Resize(fyne.NewSize(600, 400))
 	settingsWin.CenterOnScreen()
+
+	applied := false
+	originalSettings := *currentSettings
+	tempSettings := *currentSettings // desired changes
 
 	var lightBtn, darkBtn *widget.Button
 
@@ -450,20 +454,18 @@ func showSettingsForm(parent fyne.Window,  currentSettings *models.Settings, a f
 	dbPathContainer := container.NewBorder(container.NewHBox(selectBtn, createBtn), nil, nil, nil, dbPathEntry)
 
 	lightBtn = widget.NewButton("Светлая", func() {
-		currentSettings.ThemeVariant = 0
+		tempSettings.ThemeVariant = 0
 		lightBtn.Importance = widget.HighImportance
 		darkBtn.Importance = widget.LowImportance
 		settingsWin.Content().Refresh()
-		a.Settings().SetTheme(theme.LightTheme())
 	})
 	darkBtn = widget.NewButton("Темная", func() {
-		currentSettings.ThemeVariant = 1
+		tempSettings.ThemeVariant = 1
 		darkBtn.Importance = widget.HighImportance
 		lightBtn.Importance = widget.LowImportance
 		settingsWin.Content().Refresh()
-		a.Settings().SetTheme(theme.DarkTheme())
 	})
-	if currentSettings.ThemeVariant == 0 {
+	if tempSettings.ThemeVariant == 0 {
 		lightBtn.Importance = widget.HighImportance
 		darkBtn.Importance = widget.LowImportance
 	} else {
@@ -473,10 +475,10 @@ func showSettingsForm(parent fyne.Window,  currentSettings *models.Settings, a f
 	themeContainer := container.NewGridWithColumns(2, lightBtn, darkBtn)
 
 	timerSlider := widget.NewSlider(1, 60)
-	timerSlider.SetValue(float64(currentSettings.TimerSeconds))
-	timerLabel := widget.NewLabel(fmt.Sprintf("%d сек", currentSettings.TimerSeconds))
+	timerSlider.SetValue(float64(tempSettings.TimerSeconds))
+	timerLabel := widget.NewLabel(fmt.Sprintf("%d сек", tempSettings.TimerSeconds))
 	timerSlider.OnChanged = func(value float64) {
-		currentSettings.TimerSeconds = int(value)
+		tempSettings.TimerSeconds = int(value)
 		timerLabel.SetText(fmt.Sprintf("%.0f сек", value))
 	}
 
@@ -489,16 +491,54 @@ func showSettingsForm(parent fyne.Window,  currentSettings *models.Settings, a f
 	)
 
 	saveBtn := widget.NewButtonWithIcon("Сохранить", theme.ConfirmIcon(), func() {
+		if !applied {
+			return
+		}
 		newSettings := models.Settings{
 			DBPath:       dbPathEntry.Text,
 			ThemeVariant: currentSettings.ThemeVariant,
 			TimerSeconds: currentSettings.TimerSeconds,
 		}
-		onSave(newSettings)
-		settingsWin.Close()
+		if dbPathEntry.Text != originalSettings.DBPath {
+			dialog.ShowConfirm("Информация",
+				"Приложение будет закрыто...",
+				func(b bool) {
+					if b {
+						onSave(newSettings)
+						settingsWin.Close()
+						a.Quit()
+					} 
+				},
+				settingsWin)
+		} else {
+			onSave(newSettings)
+			settingsWin.Close()
+		}
+	})
+	saveBtn.Disable()
+	saveBtn.Importance = widget.SuccessImportance
+
+	applyBtn := widget.NewButtonWithIcon("Применить", theme.ConfirmIcon(), func() {
+		applied = true
+		*currentSettings = tempSettings
+		if tempSettings.ThemeVariant == 0 {
+			a.Settings().SetTheme(theme.LightTheme())
+		} else {
+			a.Settings().SetTheme(theme.DarkTheme())
+		}
+		saveBtn.Enable()
+		settingsWin.Content().Refresh()
 	})
 
 	cancelBtn := widget.NewButtonWithIcon("Отмена", theme.CancelIcon(), func() {
+		if applied {
+			*currentSettings = originalSettings
+			if originalSettings.ThemeVariant == 0 {
+				a.Settings().SetTheme(theme.LightTheme())
+			} else {
+				a.Settings().SetTheme(theme.DarkTheme())
+			}
+		}
 		settingsWin.Close()
 	})
 
@@ -508,11 +548,23 @@ func showSettingsForm(parent fyne.Window,  currentSettings *models.Settings, a f
 		widget.NewRichTextWithText("* - изменения вступят в силу после перезапуска!"),
 		container.NewHBox(
 			layout.NewSpacer(),
+			applyBtn,
 			saveBtn,
 			cancelBtn,
 		),
 	)
 
 	settingsWin.SetContent(container.NewPadded(content))
+	settingsWin.SetCloseIntercept(func() {
+		if applied {
+			*currentSettings = originalSettings
+			if originalSettings.ThemeVariant == 0 {
+				a.Settings().SetTheme(theme.LightTheme())
+			} else {
+				a.Settings().SetTheme(theme.DarkTheme())
+			}
+		}
+		settingsWin.Close()
+	})
 	settingsWin.Show()
 }
