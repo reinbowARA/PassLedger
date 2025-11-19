@@ -501,7 +501,7 @@ func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fy
 		}
 		if dbPathEntry.Text != originalSettings.DBPath {
 			dialog.ShowConfirm("Информация",
-				"Приложение будет закрыто...",
+				"Приложение будет закрыто для применения изменений пути к БД. Перезапустите приложение вручную.",
 				func(b bool) {
 					if b {
 						onSave(newSettings)
