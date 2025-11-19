@@ -3,9 +3,11 @@ package app
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
@@ -36,6 +38,48 @@ func ShowLoginWindow(a fyne.App) {
 	warningLabel.Wrapping = fyne.TextWrapWord
 	warningLabel.Hidden = !isFirstTime
 
+	// Database path selection elements (only for first time)
+	dbFolderLabel := widget.NewLabel("Выберите папку базы данных:")
+	dbFolderLabel.Hidden = !isFirstTime
+
+
+
+	dbFolderEntry := widget.NewEntry()
+	dbFolderEntry.SetPlaceHolder("Папка базы данных")
+	dbFolderEntry.SetText("data")
+	dbFolderEntry.Hidden = !isFirstTime
+
+	dbFolderEntryContainer := container.New(
+		layout.NewGridWrapLayout(fyne.NewSize(250, 36)),
+		dbFolderEntry,
+	)
+
+	dbFileEntry := widget.NewEntry()
+	dbFileEntry.SetPlaceHolder("Имя файла")
+	dbFileEntry.SetText("passwords.db")
+	dbFileEntry.Hidden = !isFirstTime
+
+	dbFileEntryContainer := container.New(
+		layout.NewGridWrapLayout(fyne.NewSize(250, 36)),
+		dbFileEntry,
+	)
+
+	browseFolderBtn := widget.NewButton("Обзор...", func() {
+		dlg := dialog.NewFolderOpen(func(list fyne.ListableURI, err error) {
+			if err != nil || list == nil {
+				return
+			}
+			dbFolderEntry.SetText(list.Path())
+		}, win)
+		dlg.Show()
+	})
+	browseFolderBtn.Hidden = !isFirstTime
+
+	dbFileLabel := widget.NewLabel("Имя файла базы данных:")
+	dbFileLabel.Hidden = !isFirstTime
+
+
+
 	status := widget.NewLabel("")
 
 	var dbase *sql.DB
@@ -55,11 +99,23 @@ func ShowLoginWindow(a fyne.App) {
 				status.SetText("Пароли не совпадают!")
 				return
 			}
+			dbfolder := dbFolderEntry.Text
+			if dbfolder == "" {
+				dbfolder = "data"
+			}
+			dbfile := dbFileEntry.Text
+			if dbfile == "" {
+				dbfile = "passwords.db"
+			}
+			dbPath = filepath.Join(dbfolder, dbfile)
 			dbase, key, err = db.CreateNewDatabase(dbPath, master)
 			if err != nil {
 				status.SetText("Ошибка создания базы: " + err.Error())
 				return
 			}
+			// Save new dbPath to settings
+			settings.DBPath = dbPath
+			SaveSettings(settings)
 			entries, _ := db.LoadAllEntries(dbase, key)
 			ShowMainWindow(a, dbase, key, entries)
 			win.Close()
@@ -82,6 +138,10 @@ func ShowLoginWindow(a fyne.App) {
 		passwordEntry,
 		confirmEntry,
 		warningLabel,
+		dbFolderLabel,
+		container.NewHBox(browseFolderBtn, dbFolderEntryContainer),
+		dbFileLabel,
+		dbFileEntryContainer,
 		status,
 		layout.NewSpacer(),
 		loginBtn,
@@ -90,7 +150,7 @@ func ShowLoginWindow(a fyne.App) {
 	win.SetContent(container.NewPadded(content))
 
 	if isFirstTime {
-		win.Resize(fyne.NewSize(400, 0))
+		win.Resize(fyne.NewSize(450, 300))
 	} else {
 		win.Resize(fyne.NewSize(350, 0))
 	}
