@@ -27,12 +27,14 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	var groupList *widget.List
 	var table *widget.Table
 	var popup *widget.PopUp
+	var overlay *widget.PopUp
 	detail := widget.NewRichText()
 	detail.Wrapping = fyne.TextWrapWord
 	currentGroup := models.DefaultNameAllGroups
 	searchText := ""
 	currentFilters := models.SearchFilters{Title: true, Username: true, URL: true}
 	var selectedRow = -1
+	var settingsWindowOpen bool
 
 	// === Toolbar ===
 
@@ -70,19 +72,22 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	}
 
 	SettingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
-		showSettingsForm(win, &settings, a, func(newSettings models.Settings) {
+		if settingsWindowOpen {
+			return
+		}
+		settingsWindowOpen = true
+		overlay = widget.NewModalPopUp(container.NewWithoutLayout(), win.Canvas())
+		overlay.Resize(fyne.NewSize(0, 0))
+		overlay.Show()
+		showSettingsForm(win, &settings, a, overlay, &settingsWindowOpen, func(newSettings models.Settings) {
 			settings = newSettings
 			err := SaveSettings(settings)
 			if err != nil {
 				dialog.ShowError(err, win)
 				return
 			}
-			// themeStr := "dark"
-			// if newSettings.ThemeVariant == 0 {
-			// 	themeStr = "light"
-			// }
-			// a.Preferences().SetString("Theme", themeStr)
-			//dialog.ShowInformation("Настройки", "Настройки сохранены. Для применения новой темы перезапустите приложение.", win)
+			overlay.Hide()
+			settingsWindowOpen = false
 		})
 	})
 
@@ -409,7 +414,7 @@ func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
 	return
 }
 
-func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fyne.App, onSave func(models.Settings)) {
+func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fyne.App, overlay *widget.PopUp, settingsWindowOpen *bool, onSave func(models.Settings)) {
 	settingsWin := fyne.CurrentApp().NewWindow("Настройки")
 	settingsWin.Resize(fyne.NewSize(600, 400))
 	settingsWin.CenterOnScreen()
@@ -496,24 +501,12 @@ func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fy
 		}
 		newSettings := models.Settings{
 			DBPath:       dbPathEntry.Text,
-			ThemeVariant: currentSettings.ThemeVariant,
-			TimerSeconds: currentSettings.TimerSeconds,
+			ThemeVariant: tempSettings.ThemeVariant,
+			TimerSeconds: tempSettings.TimerSeconds,
 		}
-		if dbPathEntry.Text != originalSettings.DBPath {
-			dialog.ShowConfirm("Информация",
-				"Приложение будет закрыто для применения изменений пути к БД. Перезапустите приложение вручную.",
-				func(b bool) {
-					if b {
-						onSave(newSettings)
-						settingsWin.Close()
-						a.Quit()
-					} 
-				},
-				settingsWin)
-		} else {
-			onSave(newSettings)
-			settingsWin.Close()
-		}
+		onSave(newSettings)
+		overlay.Hide()
+		settingsWin.Close()
 	})
 	saveBtn.Disable()
 	saveBtn.Importance = widget.SuccessImportance
@@ -527,7 +520,6 @@ func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fy
 			a.Settings().SetTheme(theme.DarkTheme())
 		}
 		saveBtn.Enable()
-		settingsWin.Content().Refresh()
 	})
 
 	cancelBtn := widget.NewButtonWithIcon("Отмена", theme.CancelIcon(), func() {
@@ -539,6 +531,8 @@ func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fy
 				a.Settings().SetTheme(theme.DarkTheme())
 			}
 		}
+		overlay.Hide()
+		*settingsWindowOpen = false
 		settingsWin.Close()
 	})
 
@@ -564,6 +558,8 @@ func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fy
 				a.Settings().SetTheme(theme.DarkTheme())
 			}
 		}
+		overlay.Hide()
+		*settingsWindowOpen = false
 		settingsWin.Close()
 	})
 	settingsWin.Show()
