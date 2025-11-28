@@ -33,3 +33,13 @@ type Settings struct {
 	ThemeVariant int    `json:"theme_variant"`
 	TimerSeconds int    `json:"timer_seconds"`
 }
+
+type PasswordGeneratorOptions struct {
+	Length       int
+	UseUppercase bool
+	UseLowercase bool
+	UseDigits    bool
+	UseSpecial   bool
+	UseSpace     bool
+	UseBrackets  bool
+}

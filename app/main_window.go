@@ -14,6 +14,9 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
+	"strconv"
+
+	"github.com/reinbowARA/PassLedger/crypto"
 	"github.com/reinbowARA/PassLedger/db"
 	"github.com/reinbowARA/PassLedger/models"
 )
@@ -65,6 +68,28 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		})
 	})
 
+	selectedName := []string{"Инструменты","Генератор пароля", "Экспорт", "Импорт"}
+
+	// Выпадающий список инструментов
+	var toolsSelect *widget.Select
+	toolsSelect = widget.NewSelect(selectedName, func(value string) {
+		switch value {
+		case selectedName[1]:
+			showPasswordGeneratorPopup(win)
+		case selectedName[2]:
+			showExportPopup(win)
+		case selectedName[3]:
+			showImportPopup(win)
+		}
+		if value != selectedName[0] {
+			toolsSelect.SetSelected(selectedName[0])
+		}
+	})
+	toolsSelect.SetSelected(selectedName[0])
+	toolSelectContainer := container.New(
+		layout.NewGridWrapLayout(fyne.NewSize(135, 36)),
+		toolsSelect)
+
 	settings, err := LoadSettings()
 	if err != nil {
 		dialog.ShowError(err, win)
@@ -98,6 +123,8 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		addBtn,
 		layout.NewSpacer(),
 		container.NewHBox(searchBox, filterBtn),
+		layout.NewSpacer(),
+		toolSelectContainer,
 		layout.NewSpacer(),
 		SettingsBtn,
 		exitBtn,
@@ -563,4 +590,114 @@ func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fy
 		settingsWin.Close()
 	})
 	settingsWin.Show()
+}
+
+func showPasswordGeneratorPopup(win fyne.Window) {
+	lengthEntry := widget.NewEntry()
+	lengthEntry.SetText("16")
+	lengthEntry.SetPlaceHolder("Длина пароля")
+
+	passwordEntry := widget.NewEntry()
+	passwordEntry.SetPlaceHolder("Сгенерированный пароль")
+	passwordEntry.Disable()
+
+	uppercaseCheck := widget.NewCheck("Использовать верхний регистр", nil)
+	uppercaseCheck.SetChecked(true)
+	lowercaseCheck := widget.NewCheck("Использовать нижний регистр", nil)
+	lowercaseCheck.SetChecked(true)
+	digitsCheck := widget.NewCheck("Использовать цифры", nil)
+	digitsCheck.SetChecked(true)
+	specialCheck := widget.NewCheck("Использовать спец-символы", nil)
+	specialCheck.SetChecked(true)
+	spaceCheck := widget.NewCheck("Использовать пробел", nil)
+	bracketsCheck := widget.NewCheck("Использовать скобки", nil)
+
+	generateBtn := widget.NewButton("Сгенерировать", func() {
+		length, err := strconv.Atoi(lengthEntry.Text)
+		if err != nil || length < 1 {
+			dialog.ShowError(fmt.Errorf("Неверная длина"), win)
+			return
+		}
+		options := models.PasswordGeneratorOptions{
+			Length:       length,
+			UseUppercase: uppercaseCheck.Checked,
+			UseLowercase: lowercaseCheck.Checked,
+			UseDigits:    digitsCheck.Checked,
+			UseSpecial:   specialCheck.Checked,
+			UseSpace:     spaceCheck.Checked,
+			UseBrackets:  bracketsCheck.Checked,
+		}
+		pass, err := crypto.GeneratePassword(options)
+		if err != nil {
+			dialog.ShowError(err, win)
+			return
+		}
+		passwordEntry.SetText(pass)
+	})
+
+	copyBtn := widget.NewButtonWithIcon("Копировать", theme.ContentCopyIcon(), func() {
+		if passwordEntry.Text != "" {
+			fyne.CurrentApp().Clipboard().SetContent(passwordEntry.Text)
+			dialog.ShowInformation("Копирование", "Пароль скопирован в буфер", win)
+		}
+	})
+
+	form := container.NewVBox(
+		widget.NewLabel("Длина пароля:"),
+		lengthEntry,
+		widget.NewLabel("Опции:"),
+		uppercaseCheck,
+		lowercaseCheck,
+		digitsCheck,
+		specialCheck,
+		spaceCheck,
+		bracketsCheck,
+		widget.NewLabel("Пароль:"),
+		passwordEntry,
+		container.NewHBox(generateBtn, copyBtn),
+		layout.NewSpacer(),
+		widget.NewButton("Закрыть", func() {
+			// Close popup
+		}),
+	)
+
+	popup := widget.NewModalPopUp(container.NewPadded(form), win.Canvas())
+	popup.Resize(fyne.NewSize(500, 400))
+
+	// Set close action for the button
+	form.Objects[len(form.Objects)-1].(*widget.Button).OnTapped = func() {
+		popup.Hide()
+	}
+
+	popup.Show()
+}
+
+func showExportPopup(win fyne.Window) {
+	content := container.NewVBox(
+		widget.NewLabel("Экспорт"),
+		widget.NewLabel("Функция экспорта в разработке"),
+		widget.NewButton("Закрыть", func() {
+			// Close popup
+		}),
+	)
+	popup := widget.NewModalPopUp(container.NewPadded(content), win.Canvas())
+	content.Objects[len(content.Objects)-1].(*widget.Button).OnTapped = func() {
+		popup.Hide()
+	}
+	popup.Show()
+}
+
+func showImportPopup(win fyne.Window) {
+	content := container.NewVBox(
+		widget.NewLabel("Импорт"),
+		widget.NewLabel("Функция импорта в разработке"),
+		widget.NewButton("Закрыть", func() {
+			// Close popup
+		}),
+	)
+	popup := widget.NewModalPopUp(container.NewPadded(content), win.Canvas())
+	content.Objects[len(content.Objects)-1].(*widget.Button).OnTapped = func() {
+		popup.Hide()
+	}
+	popup.Show()
 }
