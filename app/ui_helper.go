@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/reinbowARA/PassLedger/db"
 	"github.com/reinbowARA/PassLedger/models"
@@ -142,4 +143,40 @@ func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
 **Заметки:** %s `,
 		entry.Title, entry.Group, entry.Username, entry.Password, entry.URL, entry.Notes)
 	return
+}
+
+func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label, win fyne.Window, cancel <-chan struct{}, timerSeconds int) {
+	fyne.DoAndWait(func() {
+		progress.SetValue(1.0)
+		progress.TextFormatter = func() string {
+			return fmt.Sprintf("%d сек", timerSeconds)
+		}
+		timerLabel.SetText("До очистки буфера осталось: ")
+		timerLabel.Show()
+		progress.Show()
+	})
+	for i := timerSeconds; i >= 0; i-- {
+		select {
+		case <-cancel:
+			return
+		case <-time.After(time.Second):
+		}
+		secLeft := i
+		fyne.DoAndWait(func() {
+			if secLeft == 0 {
+				a.Clipboard().SetContent("")
+				timerLabel.Hide()
+				progress.Hide()
+			} else {
+				progress.TextFormatter = func() string {
+					return fmt.Sprintf("%d сек", secLeft)
+				}
+				progress.SetValue(float64(secLeft) / float64(timerSeconds))
+				timerLabel.SetText("До очистки буфера осталось: ")
+			}
+		})
+		if secLeft == 0 {
+			return
+		}
+	}
 }
