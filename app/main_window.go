@@ -601,16 +601,16 @@ func showPasswordGeneratorPopup(win fyne.Window) {
 	passwordEntry.SetPlaceHolder("Сгенерированный пароль")
 	passwordEntry.Disable()
 
-	uppercaseCheck := widget.NewCheck("Использовать верхний регистр", nil)
+	uppercaseCheck := widget.NewCheck("Использовать верхний регистр (ABCDEFGHIJKLMNOPQRSTUVWXYZ)", nil)
 	uppercaseCheck.SetChecked(true)
-	lowercaseCheck := widget.NewCheck("Использовать нижний регистр", nil)
+	lowercaseCheck := widget.NewCheck("Использовать нижний регистр (abcdefghijklmnopqrstuvwxyz)", nil)
 	lowercaseCheck.SetChecked(true)
-	digitsCheck := widget.NewCheck("Использовать цифры", nil)
+	digitsCheck := widget.NewCheck("Использовать цифры (0123456789)", nil)
 	digitsCheck.SetChecked(true)
-	specialCheck := widget.NewCheck("Использовать спец-символы", nil)
+	specialCheck := widget.NewCheck("Использовать спец-символы (!@#$%^&*-_=+;:,.?/~`)", nil)
 	specialCheck.SetChecked(true)
 	spaceCheck := widget.NewCheck("Использовать пробел", nil)
-	bracketsCheck := widget.NewCheck("Использовать скобки", nil)
+	bracketsCheck := widget.NewCheck("Использовать скобки ('[',']','{','}','(',')','<','>')", nil)
 
 	generateBtn := widget.NewButton("Сгенерировать", func() {
 		length, err := strconv.Atoi(lengthEntry.Text)
