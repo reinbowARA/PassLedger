@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/reinbowARA/PassLedger/db"
@@ -126,4 +127,19 @@ func showFilterDialog(win fyne.Window, filters *models.SearchFilters, onChange f
 			onChange()
 		}
 	}, win)
+}
+
+func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
+	if hidePasswd {
+		entry.Password = maskPassword(entry.Password)
+	}
+	text = fmt.Sprintf(`
+**Название:** %s
+**Группа:** %s
+**Логин:** %s
+**Пароль:** %s
+**URL:** %s
+**Заметки:** %s `,
+		entry.Title, entry.Group, entry.Username, entry.Password, entry.URL, entry.Notes)
+	return
 }

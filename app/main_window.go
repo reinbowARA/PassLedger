@@ -10,13 +10,9 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 
-	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"strconv"
-
-	"github.com/reinbowARA/PassLedger/crypto"
 	"github.com/reinbowARA/PassLedger/db"
 	"github.com/reinbowARA/PassLedger/models"
 )
@@ -68,7 +64,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		})
 	})
 
-	selectedName := []string{"Инструменты","Генератор пароля", "Экспорт", "Импорт"}
+	selectedName := []string{"Инструменты", "Генератор пароля", "Экспорт", "Импорт"}
 
 	// Выпадающий список инструментов
 	var toolsSelect *widget.Select
@@ -77,9 +73,13 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 		case selectedName[1]:
 			showPasswordGeneratorPopup(win)
 		case selectedName[2]:
-			showExportPopup(win)
+			showExportPopup(win, database, key)
 		case selectedName[3]:
-			showImportPopup(win)
+			showImportPopup(win, database, key, func() {
+				refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)
+				groupsSlice = getUniqueGroupsFromDB(database, key)
+				groupList.Refresh()
+			})
 		}
 		if value != selectedName[0] {
 			toolsSelect.SetSelected(selectedName[0])
@@ -424,280 +424,4 @@ func runTimer(a fyne.App, progress *widget.ProgressBar, timerLabel *widget.Label
 			return
 		}
 	}
-}
-
-func ShowEntry(entry models.PasswordEntry, hidePasswd bool) (text string) {
-	if hidePasswd {
-		entry.Password = maskPassword(entry.Password)
-	}
-	text = fmt.Sprintf(`
-**Название:** %s
-**Группа:** %s
-**Логин:** %s
-**Пароль:** %s
-**URL:** %s
-**Заметки:** %s `,
-		entry.Title, entry.Group, entry.Username, entry.Password, entry.URL, entry.Notes)
-	return
-}
-
-func showSettingsForm(parent fyne.Window, currentSettings *models.Settings, a fyne.App, overlay *widget.PopUp, settingsWindowOpen *bool, onSave func(models.Settings)) {
-	settingsWin := fyne.CurrentApp().NewWindow("Настройки")
-	settingsWin.Resize(fyne.NewSize(600, 400))
-	settingsWin.CenterOnScreen()
-
-	applied := false
-	originalSettings := *currentSettings
-	tempSettings := *currentSettings // desired changes
-
-	var lightBtn, darkBtn *widget.Button
-
-	dbPathEntry := widget.NewEntry()
-	dbPathEntry.SetText(currentSettings.DBPath)
-	dbPathEntry.SetPlaceHolder("Путь к файлу базы данных")
-	dbPathEntry.Disable() // Делаем его не редактируемым, только через выбор
-
-	selectBtn := widget.NewButtonWithIcon("Выбрать файл", theme.FolderOpenIcon(), func() {
-		fd := dialog.NewFileOpen(func(uc fyne.URIReadCloser, e error) {
-			if uc != nil {
-				path := uc.URI().Path()
-				dbPathEntry.SetText(path)
-			}
-		}, settingsWin)
-		filter := storage.NewExtensionFileFilter([]string{".db"})
-		fd.SetFilter(filter)
-		fd.Resize(fyne.NewSize(800, 600))
-		fd.Show()
-	})
-
-	createBtn := widget.NewButtonWithIcon("Создать файл", theme.ContentAddIcon(), func() {
-		fd := dialog.NewFileSave(func(uc fyne.URIWriteCloser, e error) {
-			if uc != nil {
-				path := uc.URI().Path()
-				dbPathEntry.SetText(path)
-			}
-		}, settingsWin)
-		filter := storage.NewExtensionFileFilter([]string{".db"})
-		fd.SetFilter(filter)
-		fd.Resize(fyne.NewSize(800, 600))
-		fd.Show()
-	})
-
-	dbPathContainer := container.NewBorder(container.NewHBox(selectBtn, createBtn), nil, nil, nil, dbPathEntry)
-
-	lightBtn = widget.NewButton("Светлая", func() {
-		tempSettings.ThemeVariant = 0
-		lightBtn.Importance = widget.HighImportance
-		darkBtn.Importance = widget.LowImportance
-		settingsWin.Content().Refresh()
-	})
-	darkBtn = widget.NewButton("Темная", func() {
-		tempSettings.ThemeVariant = 1
-		darkBtn.Importance = widget.HighImportance
-		lightBtn.Importance = widget.LowImportance
-		settingsWin.Content().Refresh()
-	})
-	if tempSettings.ThemeVariant == 0 {
-		lightBtn.Importance = widget.HighImportance
-		darkBtn.Importance = widget.LowImportance
-	} else {
-		lightBtn.Importance = widget.LowImportance
-		darkBtn.Importance = widget.HighImportance
-	}
-	themeContainer := container.NewGridWithColumns(2, lightBtn, darkBtn)
-
-	timerSlider := widget.NewSlider(1, 60)
-	timerSlider.SetValue(float64(tempSettings.TimerSeconds))
-	timerLabel := widget.NewLabel(fmt.Sprintf("%d сек", tempSettings.TimerSeconds))
-	timerSlider.OnChanged = func(value float64) {
-		tempSettings.TimerSeconds = int(value)
-		timerLabel.SetText(fmt.Sprintf("%.0f сек", value))
-	}
-
-	timerContainer := container.NewVBox(timerSlider, timerLabel)
-
-	form := widget.NewForm(
-		widget.NewFormItem("Путь к БД*", dbPathContainer),
-		widget.NewFormItem("Тема", themeContainer),
-		widget.NewFormItem("Таймер очистки буфера (сек)", timerContainer),
-	)
-
-	saveBtn := widget.NewButtonWithIcon("Сохранить", theme.ConfirmIcon(), func() {
-		if !applied {
-			return
-		}
-		newSettings := models.Settings{
-			DBPath:       dbPathEntry.Text,
-			ThemeVariant: tempSettings.ThemeVariant,
-			TimerSeconds: tempSettings.TimerSeconds,
-		}
-		onSave(newSettings)
-		overlay.Hide()
-		settingsWin.Close()
-	})
-	saveBtn.Disable()
-	saveBtn.Importance = widget.SuccessImportance
-
-	applyBtn := widget.NewButtonWithIcon("Применить", theme.ConfirmIcon(), func() {
-		applied = true
-		*currentSettings = tempSettings
-		if tempSettings.ThemeVariant == 0 {
-			a.Settings().SetTheme(theme.LightTheme())
-		} else {
-			a.Settings().SetTheme(theme.DarkTheme())
-		}
-		saveBtn.Enable()
-	})
-
-	cancelBtn := widget.NewButtonWithIcon("Отмена", theme.CancelIcon(), func() {
-		if applied {
-			*currentSettings = originalSettings
-			if originalSettings.ThemeVariant == 0 {
-				a.Settings().SetTheme(theme.LightTheme())
-			} else {
-				a.Settings().SetTheme(theme.DarkTheme())
-			}
-		}
-		overlay.Hide()
-		*settingsWindowOpen = false
-		settingsWin.Close()
-	})
-
-	content := container.NewVBox(
-		form,
-		layout.NewSpacer(),
-		widget.NewRichTextWithText("* - изменения вступят в силу после перезапуска!"),
-		container.NewHBox(
-			layout.NewSpacer(),
-			applyBtn,
-			saveBtn,
-			cancelBtn,
-		),
-	)
-
-	settingsWin.SetContent(container.NewPadded(content))
-	settingsWin.SetCloseIntercept(func() {
-		if applied {
-			*currentSettings = originalSettings
-			if originalSettings.ThemeVariant == 0 {
-				a.Settings().SetTheme(theme.LightTheme())
-			} else {
-				a.Settings().SetTheme(theme.DarkTheme())
-			}
-		}
-		overlay.Hide()
-		*settingsWindowOpen = false
-		settingsWin.Close()
-	})
-	settingsWin.Show()
-}
-
-func showPasswordGeneratorPopup(win fyne.Window) {
-	lengthEntry := widget.NewEntry()
-	lengthEntry.SetText("16")
-	lengthEntry.SetPlaceHolder("Длина пароля")
-
-	passwordEntry := widget.NewEntry()
-	passwordEntry.SetPlaceHolder("Сгенерированный пароль")
-	passwordEntry.Disable()
-
-	uppercaseCheck := widget.NewCheck("Использовать верхний регистр (ABCDEFGHIJKLMNOPQRSTUVWXYZ)", nil)
-	uppercaseCheck.SetChecked(true)
-	lowercaseCheck := widget.NewCheck("Использовать нижний регистр (abcdefghijklmnopqrstuvwxyz)", nil)
-	lowercaseCheck.SetChecked(true)
-	digitsCheck := widget.NewCheck("Использовать цифры (0123456789)", nil)
-	digitsCheck.SetChecked(true)
-	specialCheck := widget.NewCheck("Использовать спец-символы (!@#$%^&*-_=+;:,.?/~`)", nil)
-	specialCheck.SetChecked(true)
-	spaceCheck := widget.NewCheck("Использовать пробел", nil)
-	bracketsCheck := widget.NewCheck("Использовать скобки ('[',']','{','}','(',')','<','>')", nil)
-
-	generateBtn := widget.NewButton("Сгенерировать", func() {
-		length, err := strconv.Atoi(lengthEntry.Text)
-		if err != nil || length < 1 {
-			dialog.ShowError(fmt.Errorf("Неверная длина"), win)
-			return
-		}
-		options := models.PasswordGeneratorOptions{
-			Length:       length,
-			UseUppercase: uppercaseCheck.Checked,
-			UseLowercase: lowercaseCheck.Checked,
-			UseDigits:    digitsCheck.Checked,
-			UseSpecial:   specialCheck.Checked,
-			UseSpace:     spaceCheck.Checked,
-			UseBrackets:  bracketsCheck.Checked,
-		}
-		pass, err := crypto.GeneratePassword(options)
-		if err != nil {
-			dialog.ShowError(err, win)
-			return
-		}
-		passwordEntry.SetText(pass)
-	})
-
-	copyBtn := widget.NewButtonWithIcon("Копировать", theme.ContentCopyIcon(), func() {
-		if passwordEntry.Text != "" {
-			fyne.CurrentApp().Clipboard().SetContent(passwordEntry.Text)
-			dialog.ShowInformation("Копирование", "Пароль скопирован в буфер", win)
-		}
-	})
-
-	form := container.NewVBox(
-		widget.NewLabel("Длина пароля:"),
-		lengthEntry,
-		widget.NewLabel("Опции:"),
-		uppercaseCheck,
-		lowercaseCheck,
-		digitsCheck,
-		specialCheck,
-		spaceCheck,
-		bracketsCheck,
-		widget.NewLabel("Пароль:"),
-		passwordEntry,
-		container.NewHBox(generateBtn, copyBtn),
-		layout.NewSpacer(),
-		widget.NewButton("Закрыть", func() {
-			// Close popup
-		}),
-	)
-
-	popup := widget.NewModalPopUp(container.NewPadded(form), win.Canvas())
-	popup.Resize(fyne.NewSize(500, 400))
-
-	// Set close action for the button
-	form.Objects[len(form.Objects)-1].(*widget.Button).OnTapped = func() {
-		popup.Hide()
-	}
-
-	popup.Show()
-}
-
-func showExportPopup(win fyne.Window) {
-	content := container.NewVBox(
-		widget.NewLabel("Экспорт"),
-		widget.NewLabel("Функция экспорта в разработке"),
-		widget.NewButton("Закрыть", func() {
-			// Close popup
-		}),
-	)
-	popup := widget.NewModalPopUp(container.NewPadded(content), win.Canvas())
-	content.Objects[len(content.Objects)-1].(*widget.Button).OnTapped = func() {
-		popup.Hide()
-	}
-	popup.Show()
-}
-
-func showImportPopup(win fyne.Window) {
-	content := container.NewVBox(
-		widget.NewLabel("Импорт"),
-		widget.NewLabel("Функция импорта в разработке"),
-		widget.NewButton("Закрыть", func() {
-			// Close popup
-		}),
-	)
-	popup := widget.NewModalPopUp(container.NewPadded(content), win.Canvas())
-	content.Objects[len(content.Objects)-1].(*widget.Button).OnTapped = func() {
-		popup.Hide()
-	}
-	popup.Show()
 }
