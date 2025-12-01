@@ -33,3 +33,4 @@ go.work.sum
 data/
 *.json
 test/
+build/

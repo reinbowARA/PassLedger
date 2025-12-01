@@ -6,11 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/mattn/go-sqlite3"
+	"embed"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/reinbowARA/PassLedger/crypto"
-	"github.com/reinbowARA/PassLedger/models"
 )
+
+//go:embed table.sql
+var DefaultDBCreateTable embed.FS
 
 func OpenOrCreateDatabase(dbPath, masterPassword string) (*sql.DB, []byte, error) {
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
@@ -29,7 +32,7 @@ func CreateNewDatabase(dbPath, masterPassword string) (db *sql.DB, key []byte, e
 		return nil, nil, err
 	}
 
-	schema, err := os.ReadFile(models.DefaultDBCreateTable)
+	schema, err := DefaultDBCreateTable.ReadFile("table.sql")
 	if err != nil {
 		return nil, nil, err
 	}

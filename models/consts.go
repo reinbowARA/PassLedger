@@ -2,7 +2,6 @@ package models
 
 const (
 	DefaultDBPath        string = "data/passwords.db"
-	DefaultDBCreateTable string = "db/table.sql"
 	DefaultNameAllGroups string = "Все"
 )
 
