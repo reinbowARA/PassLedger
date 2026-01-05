@@ -116,6 +116,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 	})
 
 	exitBtn := widget.NewButtonWithIcon("Выйти", theme.LogoutIcon(), func() {
+		a.Clipboard().SetContent("")
 		a.Quit()
 	})
 	toolbar := container.NewHBox(
