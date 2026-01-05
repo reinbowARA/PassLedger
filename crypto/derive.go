@@ -10,15 +10,17 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-// HMACStreebog256 вычисляет HMAC с использованием Streebog-256
+// HMACStreebog256 вычисляет HMAC (Hash-based Message Authentication Code) используя хеш-функцию Streebog-256.
+// Алгоритм: создаёт HMAC объект с ключом, записывает данные и возвращает итоговый хеш.
 func HMACStreebog256(key, data []byte) []byte {
 	mac := hmac.New(func() hash.Hash { return gost_streebog.New() }, key)
 	mac.Write(data)
 	return mac.Sum(nil)
 }
 
-// KDF_GOSTR3411_2012_256 -- простой контр-ориентированный KDF на HMAC(Streebog)
-// seed — ключ (или псевдослучай), label/context — дополнительные поля
+// KDF_GOSTR3411_2012_256 реализует ключевой выводной функцию (KDF) на основе HMAC с Streebog, как определено в ГОСТ.
+// Алгоритм: использует счётчик, для каждого шага вычисляет HMAC от seed с label, 0x00, context и счётчиком,
+// собирает выходные байты до достижения требуемого размера ключа.
 func KDF_GOSTR3411_2012_256(seed, label, context []byte, keySize int) ([]byte, error) {
 	if keySize <= 0 || keySize > 64 {
 		return nil, fmt.Errorf("неверный размер ключа: %d", keySize)
@@ -40,8 +42,9 @@ func KDF_GOSTR3411_2012_256(seed, label, context []byte, keySize int) ([]byte, e
 	return out[:keySize], nil
 }
 
-// DeriveKeyFromPassword: комбинируем HMAC(Streebog) + PBKDF2(Streebog) + KDF
-// Возвращает 32-байтовый ключ (для Кузнечика используем 32 байта)
+// DeriveKeyFromPassword деривирует криптографический ключ из пароля, соли и количества итераций.
+// Алгоритм: сначала вычисляет HMAC от пароля для начального ключа, затем применяет PBKDF2 с Streebog,
+// и наконец использует дополнительную KDF для получения финального 32-байтового ключа.
 func DeriveKeyFromPassword(password []byte, salt []byte, iterations int) ([]byte, error) {
 	// 1) первичный HMAC от пароля
 	hmacKey := HMACStreebog256(password, password)

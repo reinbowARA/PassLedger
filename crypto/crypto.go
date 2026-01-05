@@ -9,7 +9,9 @@ import (
 	gost_kuznechik "github.com/pedroalbanese/gogost/gost3412128"
 )
 
-// PKCS7 padding
+// pkcs7Pad добавляет padding по стандарту PKCS7 к входным данным, чтобы их длина стала кратной blockSize.
+// Алгоритм: вычисляет сколько байтов нужно добавить, создаёт новый массив с дополнительными байтами,
+// каждый из которых равен количеству добавленных байтов, и копирует оригинальные данные.
 func pkcs7Pad(b []byte, blockSize int) []byte {
 	pad := blockSize - (len(b) % blockSize)
 	out := make([]byte, len(b)+pad)
@@ -20,6 +22,9 @@ func pkcs7Pad(b []byte, blockSize int) []byte {
 	return out
 }
 
+// pkcs7Unpad убирает padding по стандарту PKCS7 из входных данных.
+// Алгоритм: берёт последний байт как количество добавленных байтов, проверяет,
+// что все padding-байты равны этому значению, и возвращает данные без padding.
 func pkcs7Unpad(b []byte) ([]byte, error) {
 	if len(b) == 0 {
 		return nil, fmt.Errorf("пустой буфер при unpad")
@@ -31,13 +36,15 @@ func pkcs7Unpad(b []byte) ([]byte, error) {
 	// basic verification
 	for i := len(b) - pad; i < len(b); i++ {
 		if int(b[i]) != pad {
-			return nil, fmt.Errorf("неверный PKCS7 padding (интегритет)")
+			return nil, fmt.Errorf("неверный PKCS7 padding")
 		}
 	}
 	return b[:len(b)-pad], nil
 }
 
-// EncryptData шифрует данные Кузнечиком (CBC + PKCS7). Возвращает IV||CT.
+// EncryptData шифрует входные данные с помощью алгоритма Кузнечик в режиме CBC с padding PKCS7.
+// Алгоритм: проверяет ключ (должен быть 32 байта), генерирует случайный IV, добавляет padding к plaintext,
+// шифрует в CBC режиме и возвращает IV + шифротекст.
 func EncryptData(key, plaintext []byte) ([]byte, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("ключ должен быть 32 байта")
@@ -61,7 +68,8 @@ func EncryptData(key, plaintext []byte) ([]byte, error) {
 	return append(iv, ct...), nil
 }
 
-// DecryptData расшифровывает данные, ожидает IV||CT
+// DecryptData расшифровывает входные данные, ожидая формат IV + шифротекст.
+// Алгоритм: проверяет ключ, извлекает IV из начала, расшифровывает в CBC режиме и убирает padding.
 func DecryptData(key, ciphertext []byte) ([]byte, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("ключ должен быть 32 байта")

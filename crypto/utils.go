@@ -9,6 +9,8 @@ import (
 	"github.com/reinbowARA/PassLedger/models"
 )
 
+// GenerateSalt генерирует случайную соль заданной длины n байтов.
+// Алгоритм: использует криптографически безопасный генератор случайных чисел (rand.Reader) для заполнения байтового массива.
 func GenerateSalt(n int) ([]byte, error) {
 	b := make([]byte, n)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
@@ -17,6 +19,8 @@ func GenerateSalt(n int) ([]byte, error) {
 	return b, nil
 }
 
+// HmacEqual сравнивает два HMAC значения в постоянное время, чтобы избежать атак по времени.
+// Алгоритм: проверяет длины, затем побитово XOR каждого байта и возвращает true, если результат ноль.
 func HmacEqual(a, b []byte) bool {
 	if len(a) != len(b) {
 		return false
@@ -28,6 +32,8 @@ func HmacEqual(a, b []byte) bool {
 	return res == 0
 }
 
+// GeneratePassword генерирует случайный пароль на основе заданных опций (длина, наборы символов).
+// Алгоритм: собирает charset из выбранных наборов, затем для каждой позиции пароля выбирает случайный символ из charset.
 func GeneratePassword(options models.PasswordGeneratorOptions) (string, error) {
 	var charset string
 	if options.UseLowercase {
