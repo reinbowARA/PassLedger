@@ -15,8 +15,7 @@ import (
 )
 
 func ShowLoginWindow(a fyne.App) {
-	win := a.NewWindow("Password Book — Вход")
-	// Resize will be set later based on isFirstTime
+	win := a.NewWindow("PassLedger")
 	win.CenterOnScreen()
 
 	settings, _ := LoadSettings()
@@ -27,14 +26,14 @@ func ShowLoginWindow(a fyne.App) {
 		isFirstTime = true
 	}
 
-	passwordEntry := widget.NewPasswordEntry()
+	var passwordEntry *widget.Entry = widget.NewPasswordEntry()
 	passwordEntry.SetPlaceHolder("Введите мастер-пароль")
 
-	confirmEntry := widget.NewPasswordEntry()
+	var confirmEntry *widget.Entry = widget.NewPasswordEntry()
 	confirmEntry.SetPlaceHolder("Повторите мастер-пароль")
 	confirmEntry.Hidden = !isFirstTime
 
-	warningLabel := widget.NewLabel("⚠️ Внимание! Мастер-пароль нельзя изменить после создания базы данных.\nЛучше запишите его на бумажку и храните в безопасном месте.")
+	var warningLabel *widget.Label = widget.NewLabel("⚠️ Внимание! Мастер-пароль нельзя изменить после создания базы данных.\nЛучше запишите его на бумажку и храните в безопасном месте.")
 	warningLabel.Wrapping = fyne.TextWrapWord
 	warningLabel.Hidden = !isFirstTime
 

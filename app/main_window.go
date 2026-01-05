@@ -36,7 +36,7 @@ func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.P
 
 	// === Toolbar ===
 
-	addBtn := widget.NewButtonWithIcon("Добавить", theme.ContentAddIcon(), func() {
+	addBtn := widget.NewButtonWithIcon("Добавить запись", theme.ContentAddIcon(), func() {
 		showAddForm(win, database, key, func(filters models.SearchFilters) {
 			currentFilters = filters
 			refreshListFiltered(database, key, &entries, win, currentGroup, searchText, currentFilters, detail)

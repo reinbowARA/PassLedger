@@ -26,7 +26,6 @@ func showPasswordGeneratorPopup(win fyne.Window) {
 
 	passwordEntry := widget.NewEntry()
 	passwordEntry.SetPlaceHolder("Сгенерированный пароль")
-	passwordEntry.Disable()
 
 	uppercaseCheck := widget.NewCheck("Использовать верхний регистр (ABCDEFGHIJKLMNOPQRSTUVWXYZ)", nil)
 	uppercaseCheck.SetChecked(true)
