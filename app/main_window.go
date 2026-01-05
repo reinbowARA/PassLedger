@@ -17,7 +17,7 @@ import (
 )
 
 func ShowMainWindow(a fyne.App, database *sql.DB, key []byte, entries []models.PasswordEntry) {
-	win := a.NewWindow("Password Book")
+	win := a.NewWindow("PassLedger")
 	win.Resize(fyne.NewSize(1000, 600))
 	win.CenterOnScreen()
 
